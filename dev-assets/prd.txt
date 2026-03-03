@@ -1,0 +1,174 @@
+Here is the **Ultimate Product Requirements Document (PRD)** for your Digital Maître d’ Agent. I have combed through every level of our conversation to ensure absolutely no minute details, states, field names, or allowed values were left behind. This is your definitive architectural blueprint.
+
+---
+
+# 📋 PRD: Digital Maître d’ (Agentforce Agent)
+
+**Version:** 2.0 (The "Level 4" Master Blueprint)
+**Primary Persona:** The Diner (Customer-facing via Chat)
+**Core Engine:** Finite State Machine (FSM) + Calibrated Confidence
+
+---
+
+## 🏗️ 1. Comprehensive Data Dictionary
+
+### 🏢 Object: `Account` (The Restaurant Metadata)
+
+Tracks the physical restaurant, its operational constraints, and its data trustworthiness.
+
+* **`Cuisine_Type__c`** (Picklist): `French`, `Italian`, `Japanese`, `Vegan`, `American`, `Mexican`, `Indian`, `Steakhouse`, `Chinese`, `Salad`. Default: none (required at record creation).
+* **`Vibe_Tags__c`** (Multi-Picklist): `Romantic`, `Business-Quiet`, `Family-Friendly`, `Trendy`, `Casual`, `Upscale`, `Outdoor-Dining`, `Live-Music`. Default: none.
+* **`Family_Friendly__c`** (Checkbox): Default: `FALSE`.
+* **`Safe_For_Allergies__c`** (Multi-Picklist): `Nut-free`, `Shellfish-free`. Default: none.
+* **`Primary_Safety_Tag__c`** (Picklist): `Certified Halal`, `Nut-Free Certified`, `HACCP Compliant`, `--None--`. Default: none.
+* **`Blackout_Dates__c`** (Long Text Area, 10000 chars): Stores JSON array of unbookable ISO dates (e.g., `["2026-12-25","2026-01-01"]`). Checked during reservation creation to block bookings.
+* **`Average_Turnover_Minutes__c`** (Number, 0 decimal places): Average dining duration in minutes. Drives `Restaurant_Slot__c` generation cadence. Default: `90`.
+* **`Grace_Period_Mins__c`** (Number, 0 decimal places): Minutes past reservation time before a no-show is flagged. Default: `15`.
+* **`Price_Tier__c`** (Picklist): `$`, `$$`, `$$$`, `$$$$`. Default: `$$`.
+* **`Last_Menu_Update__c`** (DateTime): Timestamp of last menu content refresh. Drives RAG freshness for Path 4 Knowledge retrieval.
+* **`Reliability_Score__c`** (Number, 0 decimal places): Integer `1` through `5`. 1 = Legacy/Risk, 5 = Absolute Truth/API Sync. Default: `3`.
+* **`Data_Last_Verified__c`** (DateTime): Timestamp of the last successful data audit/sync.
+* **`Reliability_Reason__c`** (Long Text Area, 5000 chars): The explanation (e.g., "Direct POS API Sync", "Weekly Manager Audit").
+* **`Inventory_Buffer_Type__c`** (Percent, 0 decimal places): Percentage of inventory held back for walk-ins/VIPs. Range `0`–`100`. Default: `0`. Applied when `Reliability_Score__c` <= 3.
+* **`Logic_State__c`** (Formula - Text, return type Text): The master AI state toggle. Not editable.
+* *Formula Logic:*
+```sql
+IF( (NOW() - Data_Last_Verified__c) > 7, "STALE",
+    IF( Reliability_Score__c <= 2, "SPECULATIVE",
+        IF( AND(Reliability_Score__c = 5, (NOW() - Data_Last_Verified__c) <= 0.16), "DETERMINISTIC",
+            IF( AND(Reliability_Score__c >= 3, (NOW() - Data_Last_Verified__c) <= 1), "PROBABILISTIC",
+                IF( AND(Reliability_Score__c = 5, (NOW() - Data_Last_Verified__c) > 1), "DEGRADED",
+                "SPECULATIVE")
+            )
+        )
+    )
+)
+```
+
+
+
+
+
+### 👤 Object: `Contact` (The Diner Profile / Unified Profile)
+
+Drives the Agent's persona, personalization, and VIP routing logic.
+
+* **`Cuisine_Preference__c`** (Picklist): `French`, `Italian`, `Japanese`, `Vegan`, `American`, `Mexican`, `Indian`, `Steakhouse`, `Chinese`, `Salad`. Mirrors `Account.Cuisine_Type__c` values. Default: none.
+* **`Allergy_Shellfish__c`** (Checkbox): Default: `FALSE`. Hard constraint for Path 3 safety gate.
+* **`Allergy_Nuts__c`** (Checkbox): Default: `FALSE`. Hard constraint for Path 3 safety gate.
+* **`Family_Status__c`** (Text, 255 chars): Free-text, e.g., "Needs High Chair", "Stroller Access".
+* **`Comm_Style__c`** (Picklist): `Brief/Efficiency`, `Leisurely/Concierge`. Default: `Brief/Efficiency`.
+* **`Membership_Level__c`** (Picklist): `Silver`, `Gold`, `Platinum`. Default: `Silver`. Drives Champagne upsells and fee waivers.
+* **`Trust_Tolerance__c`** (Number, 0 decimal places): Integer `1` to `5`. Default: `3`. Compared against `Account.Reliability_Score__c` — when Contact value > Account value, triggers Path 2 proactive escalation.
+* **`Sentiment_Score__c`** (Number, 2 decimal places): Range `-1.00` to `1.00`. Default: `0.00`. Drops below `-0.70` trigger Path 2 escalation.
+* **`Lifetime_No_Show_Count__c`** (Number, 0 decimal places): Default: `0`. Hard gate: value >= `3` blocks automated bookings.
+* **`Churn_Risk__c`** (Checkbox): Default: `FALSE`. When `TRUE`, triggers expedited Path 2 Escalation routing.
+
+### 📅 Object: `Reservation__c` (The Transaction Record)
+
+* **`Status__c`** (Picklist): `Confirmed`, `Cancelled`, `Modified`, `Pending_Staff_Approval`, `Escalated`. Default: `Confirmed`.
+* **`Reservation_DateTime__c`** (DateTime): The target date and time for the reservation. **Required.**
+* **`Is_Locked__c`** (Formula - Checkbox, return type Checkbox): Returns `TRUE` when the reservation is less than 1 hour away or in the past (un-modifiable). Formula: `(Reservation_DateTime__c - NOW()) < 0.0416`. Not editable.
+* **`Assigned_Table_Slot__c`** (Lookup → `Restaurant_Slot__c`): The critical link for releasing inventory on modification/cancellation.
+* **`Original_Reservation_Id__c`** (Lookup → `Reservation__c`): Self-referential. Points to the original record when a reservation is modified; maintains audit trail.
+* **`Modification_Count__c`** (Number, 0 decimal places): Default: `0`. Loop detection — values > `3` trigger Path 2 escalation.
+* **`Modification_History__c`** (Long Text Area, 10000 chars): Timestamped audit log of all modifications.
+* **`AI_Summary__c`** (Long Text Area, 5000 chars): LLM-generated context summary passed to humans on Path 2 escalation.
+* **`Contact__c`** (Lookup → `Contact`): The diner who owns this reservation. **Required.**
+* **`Restaurant__c`** (Lookup → `Account`): The restaurant this reservation is for. **Required.**
+* **`Party_Size__c`** (Number, 0 decimal places): Number of guests. Minimum: `1`. Validated against `Restaurant_Table__c.Capacity__c` during booking. **Required.**
+
+### 🪑 Object: `Restaurant_Table__c` (Physical Asset)
+
+* **`Restaurant__c`** (Lookup → `Account`): The restaurant this table belongs to. **Required.**
+* **`Capacity__c`** (Number, 0 decimal places): Physical seat count. Minimum: `1`. **Required.**
+* **`Table_Type__c`** (Picklist): `Window`, `Booth`, `Standard`, `Patio`. Default: `Standard`.
+* **`ADA_Accessible__c`** (Checkbox): Default: `FALSE`. Hard filter for mobility-access requirements.
+
+### ⏳ Object: `Restaurant_Slot__c` (Temporal Inventory Engine)
+
+* **`Slot_Start_Time__c`** (DateTime): Start time of the booking window. Generated in increments driven by `Account.Average_Turnover_Minutes__c`. **Required.**
+* **`Status__c`** (Picklist): `Available`, `Reserved`, `Blocked`. Default: `Available`.
+* **`Table__c`** (Lookup → `Restaurant_Table__c`): The physical table this time slot is assigned to. **Required.**
+
+### 📚 Object: `Knowledge__kav` (RAG Unstructured Data)
+
+* **`Article_Type__c`** (Picklist): `Menu`, `Policy`, `Parking`. Default: `Policy`.
+* **`Restaurant_Lookup__c`** (Lookup → `Account`): The restaurant this article applies to. Leave blank for global/chain-wide articles.
+* **`Answer__c`** (Rich Text Area, 32000 chars): The core vectorized content for RAG retrieval.
+* **`AI_Confidence_Score__c`** (Number, 2 decimal places): Range `0.00` to `1.00`. Default: `0.50`. Values >= `0.80` = "Official" priority; below `0.50` = "Draft" (deprioritized in retrieval).
+* **`Policy_Effective_Date__c`** (Date): Policies with past effective dates are deprioritized in retrieval. Used to flag stale RAG data.
+* **`PII_Sensitivity__c`** (Picklist): `Public`, `Internal`, `Restricted`. Default: `Public`. Einstein Trust Layer masking is triggered for `Internal` and `Restricted` values.
+
+---
+
+## ⚙️ 2. The Finite State Machine (The 4 Paths)
+
+### Path 1: Transactional (Modify/Cancel)
+
+* **Trigger:** Intent to alter `Reservation__c`.
+* **State:** `S4_Business_Gate`
+* *Check:* Evaluate `Reservation__c.Is_Locked__c`.
+* *Transition A:* If `TRUE` $\rightarrow$ **State: S4b_Refusal**. Agent politely declines based on policy and pivots to Path 2 (Human Escalate).
+* *Transition B:* If `FALSE` $\rightarrow$ **State: S4c_Modification**.
+* *Action:* Execute `ReservationManager.cls` (Apex Invocable). Swap `Restaurant_Slot__c.Status__c` from Reserved to Available, secure new slot, stamp `Original_Reservation_Id__c`.
+
+
+
+### Path 2: Safety Net (Human Escalation)
+
+* **Trigger:** High-risk keyword (Allergy, Manager), `Sentiment_Score__c < -0.7`, `Modification_Count__c > 3`, or User `Trust_Tolerance__c` > Account `Reliability_Score__c`.
+* **State:** `S3_Circuit_Breaker`
+* *Action:* Immediately halt LLM generation.
+* *Transition:* Run `Summarize Conversation` node $\rightarrow$ Populate `AI_Summary__c` $\rightarrow$ Execute `Route_to_Human_Flow` to `Tier_2_Human_Concierge` Queue.
+
+
+
+### Path 3: Concierge (Personalized Recommendation)
+
+* **Trigger:** Discovery intent ("Where should I eat?").
+* **State:** `S2_Personalized_Grounding`
+* *Action:* Query Data Cloud Unified Profile. Read `Contact.Comm_Style__c` to set generation tone.
+* *Transition A (Safety Gate):* Cross-reference `Contact.Allergy_Shellfish__c` with `Account.Safe_For_Allergies__c`. Exclude mismatches entirely.
+* *Transition B (Preference Match):* Map `Contact.Cuisine_Preference__c` to `Account.Cuisine_Type__c`. Upsell based on `Membership_Level__c`.
+
+
+
+### Path 4: Knowledge (RAG/FAQ)
+
+* **Trigger:** Question regarding policies, menus, or dress code.
+* **State:** `S5_Strict_RAG`
+* *Action:* Trigger Search Index Retriever against `Knowledge__kav` and `ContentVersion` (Menus).
+* *Constraint:* strictly block external URL generation (`Source_URL__c` disabled). Rely only on `Answer__c` text.
+
+
+
+---
+
+## 🚦 3. Calibrated Confidence Logic (The Brain)
+
+This logic dictates the Agent's tone and authority limit. The Agent *must* read `Account.Logic_State__c` before generating a response regarding inventory.
+
+| `Logic_State__c` | Underlying Condition (`Score` + `Freshness`) | Agent Persona Tone | Action Authorization |
+| --- | --- | --- | --- |
+| **`DETERMINISTIC`** | Score = 5 **AND** Verified < 4 Hrs (0.16d) | **Authoritative:** "Confirmed", "Secured". No disclaimers. | Full Auto-Commit (`Status__c` = 'Confirmed') |
+| **`PROBABILISTIC`** | Score ≥ 3 **AND** Verified ≤ 24 Hrs (1d), excluding DETERMINISTIC | **Helpful/Cautious:** "Latest records show..." Mentions verify time. | Auto-Commit + Success Msg |
+| **`DEGRADED`** | Score = 5 **AND** Verified > 24 Hrs (1d) | **Transparent:** Mentions high-tier data is stale. | Commit + Disclaimer Warning |
+| **`SPECULATIVE`** | Score 1-2 **AND** Any Time | **Facilitator:** "Requesting", "Checking". Never promises. | Create Record (`Status__c` = 'Pending_Staff_Approval') |
+| **`STALE`** | Any Score **AND** Verified > 7 Days | **Risk-Averse:** Proactively offers human handoff. | **Handoff Only (Path 2)** |
+
+---
+
+## 🛠️ 4. System & Integration Requirements
+
+1. **Apex Action:** `ReservationManager.cls` - Handles atomic transaction logic for Path 1, ensuring party size vs `Capacity__c` constraints.
+2. **Data Cloud:** * Ingest standard objects (`Account`, `Contact`, `Case`) and custom objects (`Reservation__c`, `Restaurant_Slot__c`).
+* Vector Search Index applied to `Knowledge__kav` and menu `ContentVersions`.
+
+
+3. **Einstein Trust Layer:** Ensure `Email` and PII fields trigger standard masking based on `PII_Sensitivity__c`.
+4. **Prompt Builder:** Requires a Flex Template incorporating the *Calibrated Confidence Logic Table* directly into the System Prompt.
+
+---
+
+**Next Step:** Your PRD is locked, comprehensively documenting every single decision, state, field, and value we discussed. **Would you like me to generate the final Agentforce System Persona Prompt that you will paste directly into the builder to breathe life into this PRD?**
