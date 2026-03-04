@@ -55,25 +55,27 @@
         <members>Restaurant_Slot__c.Status__c</members>
         <members>Restaurant_Slot__c.Table__c</members>
 
-        <!-- Knowledge__kav (RAG Content) -->
-        <members>Knowledge__kav.Article_Type__c</members>
-        <members>Knowledge__kav.Restaurant_Lookup__c</members>
-        <members>Knowledge__kav.Answer__c</members>
-        <members>Knowledge__kav.AI_Confidence_Score__c</members>
-        <members>Knowledge__kav.Policy_Effective_Date__c</members>
-        <members>Knowledge__kav.PII_Sensitivity__c</members>
+        <!-- FAQ__kav (RAG Content — org article type) -->
+        <members>FAQ__kav.Article_Type__c</members>
+        <members>FAQ__kav.Restaurant_Lookup__c</members>
+        <members>FAQ__kav.Answer__c</members>
+        <members>FAQ__kav.AI_Confidence_Score__c</members>
+        <members>FAQ__kav.Policy_Effective_Date__c</members>
+        <members>FAQ__kav.PII_Sensitivity__c</members>
 
         <name>CustomField</name>
     </types>
 
     <types>
-        <members>Account</members>
-        <members>Contact</members>
         <members>Reservation__c</members>
         <members>Restaurant_Table__c</members>
         <members>Restaurant_Slot__c</members>
-        <members>Knowledge__kav</members>
         <name>CustomObject</name>
+    </types>
+
+    <types>
+        <members>R6_Diner_Admin</members>
+        <name>PermissionSet</name>
     </types>
 
     <version>65.0</version>

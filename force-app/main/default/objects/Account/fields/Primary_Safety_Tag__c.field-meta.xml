@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Primary_Safety_Tag__c</fullName>
+    <label>Primary Safety Tag</label>
+    <type>Picklist</type>
+    <required>false</required>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Certified Halal</fullName><default>false</default><label>Certified Halal</label></value>
+            <value><fullName>Nut-Free Certified</fullName><default>false</default><label>Nut-Free Certified</label></value>
+            <value><fullName>HACCP Compliant</fullName><default>false</default><label>HACCP Compliant</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

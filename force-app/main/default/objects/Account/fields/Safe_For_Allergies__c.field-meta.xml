@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Safe_For_Allergies__c</fullName>
+    <label>Safe For Allergies</label>
+    <type>MultiselectPicklist</type>
+    <required>false</required>
+    <visibleLines>4</visibleLines>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Nut-free</fullName><default>false</default><label>Nut-free</label></value>
+            <value><fullName>Shellfish-free</fullName><default>false</default><label>Shellfish-free</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

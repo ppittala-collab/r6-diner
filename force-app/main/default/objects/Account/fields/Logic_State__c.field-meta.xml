@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Logic_State__c</fullName>
+    <label>Logic State</label>
+    <type>Text</type>
+    <formula>IF( (NOW() - Data_Last_Verified__c) &gt; 7, &quot;STALE&quot;,
+    IF( Reliability_Score__c &lt;= 2, &quot;SPECULATIVE&quot;,
+        IF( AND(Reliability_Score__c = 5, (NOW() - Data_Last_Verified__c) &lt;= 0.16), &quot;DETERMINISTIC&quot;,
+            IF( AND(Reliability_Score__c &gt;= 3, (NOW() - Data_Last_Verified__c) &lt;= 1), &quot;PROBABILISTIC&quot;,
+                IF( AND(Reliability_Score__c = 5, (NOW() - Data_Last_Verified__c) &gt; 1), &quot;DEGRADED&quot;,
+                &quot;SPECULATIVE&quot;)
+            )
+        )
+    )
+)</formula>
+    <formulaTreatBlanksAs>BlankAsZero</formulaTreatBlanksAs>
+    <description>Master AI confidence state toggle</description>
+</CustomField>

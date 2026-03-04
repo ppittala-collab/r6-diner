@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Vibe_Tags__c</fullName>
+    <label>Vibe Tags</label>
+    <type>MultiselectPicklist</type>
+    <required>false</required>
+    <visibleLines>4</visibleLines>
+    <valueSet>
+        <restricted>true</restricted>
+        <valueSetDefinition>
+            <sorted>false</sorted>
+            <value><fullName>Romantic</fullName><default>false</default><label>Romantic</label></value>
+            <value><fullName>Business-Quiet</fullName><default>false</default><label>Business-Quiet</label></value>
+            <value><fullName>Family-Friendly</fullName><default>false</default><label>Family-Friendly</label></value>
+            <value><fullName>Trendy</fullName><default>false</default><label>Trendy</label></value>
+            <value><fullName>Casual</fullName><default>false</default><label>Casual</label></value>
+            <value><fullName>Upscale</fullName><default>false</default><label>Upscale</label></value>
+            <value><fullName>Outdoor-Dining</fullName><default>false</default><label>Outdoor-Dining</label></value>
+            <value><fullName>Live-Music</fullName><default>false</default><label>Live-Music</label></value>
+        </valueSetDefinition>
+    </valueSet>
+</CustomField>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Table__c</fullName>
+    <label>Table</label>
+    <type>Lookup</type>
+    <referenceTo>Restaurant_Table__c</referenceTo>
+    <relationshipName>Restaurant_Slots</relationshipName>
+    <relationshipLabel>Restaurant Slots</relationshipLabel>
+    <deleteConstraint>Restrict</deleteConstraint>
+    <required>true</required>
+</CustomField>
