@@ -55,7 +55,7 @@ r6_diner_agent/
 ├── manifest/
 │   └── package.xml                # Deployment manifest (49 fields, 3 objects, 1 class, 1 permset)
 ├── scripts/apex/
-│   └── masterSetup.apex           # One-time seed data script (v3.0)
+│   └── MasterSetup.apex           # One-time seed data script (v3.0)
 ├── dev-assets/
 │   ├── prd.txt                    # Product Requirements Document (v2.1)
 │   ├── changelog.md               # Full change history
@@ -157,9 +157,11 @@ sf org assign permset \
 
 The seed script creates a complete test ecosystem: 10 restaurants, 32 tables, 256 time slots, 10 diners, 5 reservations, 14 Knowledge articles, and 10 menus.
 
+**Before running:** The script uses `FAQ__kav` as the Knowledge article type. If your org uses a different type (see Step 4), search-and-replace `FAQ__kav` with your article type name throughout the script.
+
 ```bash
 sf apex run \
-  --file scripts/apex/masterSetup.apex \
+  --file scripts/apex/MasterSetup.apex \
   --target-org my-r6-org
 ```
 
@@ -237,7 +239,7 @@ The `Account.Logic_State__c` formula field drives agent behavior:
 
 ## Seed Data Summary
 
-The `masterSetup.apex` script creates test data covering all FSM paths:
+The `MasterSetup.apex` script creates test data covering all FSM paths:
 
 | Category | Records | Test Coverage |
 |---|---|---|

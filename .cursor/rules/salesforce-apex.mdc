@@ -1,0 +1,32 @@
+---
+description: Salesforce Apex and metadata conventions for R6 Diner
+globs: "{**/*.cls,**/*.apex,**/*-meta.xml}"
+alwaysApply: false
+---
+
+# Salesforce Apex Conventions
+
+## Apex Classes
+
+- Use `with sharing` on all classes unless explicitly required otherwise.
+- InvocableMethod classes use inner `ActionRequest` / `ActionResult` wrapper classes.
+- SOQL: no inline comments inside queries (causes compilation failures).
+- All Apex metadata uses API version 65.0.
+
+## Deployment Checklist
+
+1. Add class to `manifest/package.xml` under `<name>ApexClass</name>`.
+2. Deploy: `sf project deploy start --manifest manifest/package.xml --target-org r6pitt1`
+3. If new fields are referenced, ensure they exist in the permission set.
+4. Update `dev-assets/changelog.md` with deploy ID and component summary.
+
+## Field API Names (org-verified)
+
+Standard objects use their API names directly. Custom objects:
+- `Reservation__c`, `Restaurant_Table__c`, `Restaurant_Slot__c`
+- Knowledge articles: `FAQ__kav` (org-specific — other orgs may differ)
+
+## Formula Fields (read-only, never set in Apex)
+
+- `Account.Logic_State__c` — calibrated confidence state
+- `Reservation__c.Is_Locked__c` — 1-hour lockout gate

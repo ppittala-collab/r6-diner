@@ -1,0 +1,58 @@
+---
+description: R6 Diner Digital Maitre d' project context — architecture, deployment, and known issues
+alwaysApply: true
+---
+
+# R6 Diner — Digital Maitre d' Agent
+
+Salesforce Agentforce project. API version 65.0. Target org alias: `r6pitt1`.
+
+## Key Files
+
+- `dev-assets/prd.txt` — Product Requirements Document (v2.1). The single source of truth for all fields, FSM paths, and calibrated confidence logic.
+- `dev-assets/changelog.md` — Full history of all changes, deployments, and fixes. Update after every deployment.
+- `manifest/package.xml` — Deployment manifest. Must stay in sync with metadata in `force-app/`.
+- `scripts/apex/MasterSetup.apex` — One-time seed data script. Creates 10 restaurants, 32 tables, 256 slots, 10 contacts, 5 reservations, 14 Knowledge articles, 10 menus.
+- `force-app/main/default/classes/ReservationManager.cls` — Path 1 Transactional action (InvocableMethod).
+
+## Deployment
+
+```bash
+sf project deploy start --manifest manifest/package.xml --target-org <alias>
+sf org assign permset --name R6_Diner_Admin --target-org <alias>
+sf apex run --file scripts/apex/MasterSetup.apex --target-org <alias>
+```
+
+## Critical Gotchas
+
+1. **Knowledge article type varies by org.** This project uses `FAQ__kav`. Other orgs may use `Knowledge__kav` or a custom name. Query `EntityDefinition` with `QualifiedApiName LIKE '%kav%'` via Tooling API to find the correct type. If different, update: `package.xml`, the `force-app/main/default/objects/FAQ__kav/` directory name, and all `FAQ__kav` references in `MasterSetup.apex`.
+2. **Field Level Security (FLS).** Custom fields are invisible to Apex and SOQL until the `R6_Diner_Admin` permission set is deployed AND assigned to the running user.
+3. **Required fields cannot be in PermissionSets.** If adding new required fields, do NOT add them to `R6_Diner_Admin.permissionset-meta.xml` — they get auto-visible FLS.
+4. **Formula fields need `readable=true, editable=false`** in the permission set to be queryable.
+5. **rollbackOnError=true is the default.** One failed component rolls back ALL components. Always check the deploy report if component counts look wrong.
+6. **MasterSetup.apex is one-time.** Running it twice creates duplicates. Delete existing data first if re-seeding.
+
+## Data Model (6 Objects, 49 Custom Fields)
+
+- **Account** (Restaurant): 15 fields including `Logic_State__c` formula (calibrated confidence)
+- **Contact** (Diner): 10 fields including `Trust_Tolerance__c`, `Sentiment_Score__c`
+- **Reservation__c**: 11 fields including `Is_Locked__c` formula (1-hr lockout gate)
+- **Restaurant_Table__c**: 4 fields (physical tables linked to Account)
+- **Restaurant_Slot__c**: 3 fields (temporal inventory linked to Table)
+- **FAQ__kav**: 6 fields (Knowledge articles for RAG)
+
+## FSM Paths
+
+| Path | Name | Trigger | Key Component |
+|------|------|---------|---------------|
+| 1 | Transactional | Modify/cancel intent | `ReservationManager.cls` |
+| 2 | Safety Net | Sentiment < -0.7, mod count > 3, trust mismatch | `Route_to_Human_Flow` (not yet built) |
+| 3 | Concierge | Discovery intent | Allergy safety gate + preference matching |
+| 4 | Knowledge | Policy/menu/FAQ question | RAG against `FAQ__kav` + `ContentVersion` |
+
+## Conventions
+
+- Always update `dev-assets/changelog.md` after deployments or structural changes.
+- Add new metadata types to `manifest/package.xml` when creating new components.
+- Apex classes go in `force-app/main/default/classes/` with a matching `-meta.xml`.
+- Use `with sharing` on all Apex classes.
