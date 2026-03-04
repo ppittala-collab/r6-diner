@@ -25,7 +25,7 @@
 | Permission set | Deployed | `R6_Diner_Admin` — full FLS for all custom fields + object CRUD |
 | Knowledge settings | Deployed | `force-app/main/default/settings/Knowledge.settings-meta.xml` |
 | Seed data script | Executed | `scripts/apex/masterSetup.apex` v3.0 — all records seeded in r6pitt1 |
-| Apex classes | Not created | `ReservationManager.cls` specified in PRD |
+| Apex classes | Deployed | `ReservationManager.cls` — Path 1 Transactional (Modify/Cancel) |
 | Flows | Not created | `Route_to_Human_Flow` specified in PRD |
 | Agentforce config | Not created | Topics, actions, persona prompt all pending |
 | Knowledge articles | Seeded | 14 FAQ__kav articles (10 Policy, 2 Parking, 2 Internal/Restricted PII) published |
@@ -392,3 +392,41 @@ All 5 calibrated confidence states confirmed working:
 `force-app/main/default/permissionsets/R6_Diner_Admin.permissionset-meta.xml`
 
 Grants full CRUD on `Reservation__c`, `Restaurant_Table__c`, `Restaurant_Slot__c` and read/edit FLS on all non-required, non-formula custom fields. Formula fields are read-only. Required fields excluded (auto-visible).
+
+---
+
+### 2026-03-03 — ReservationManager.cls (Path 1: Transactional)
+
+First Apex class deployed: `force-app/main/default/classes/ReservationManager.cls`
+
+#### What It Does
+
+`@InvocableMethod` named **Modify Reservation Slot** — the Agentforce-callable action for Path 1 (Transactional Modify/Cancel). Accepts a `reservationId` and `newStartTime`, performs an atomic slot swap with full audit trail.
+
+#### Gates Implemented
+
+| Gate | Field | Threshold | Response Code |
+|---|---|---|---|
+| 1-Hour Lockout | `Is_Locked__c` (formula) | `TRUE` | `MODIFICATION_DENIED` |
+| Modification Loop | `Modification_Count__c` | >= 3 | `ESCALATION_REQUIRED` |
+
+#### Slot Matching Logic
+
+Queries `Restaurant_Slot__c` where:
+- `Slot_Start_Time__c` matches requested time
+- `Table__r.Restaurant__c` matches original restaurant
+- `Table__r.Capacity__c >= Party_Size__c` (closest fit via ASC sort)
+- `Status__c = 'Available'`
+
+#### Atomic Swap Sequence
+
+1. Release old slot (`Status__c = 'Available'`)
+2. Reserve new slot (`Status__c = 'Reserved'`)
+3. Cancel old reservation (`Status__c = 'Cancelled'`)
+4. Insert new reservation linked via `Original_Reservation_Id__c`
+
+#### Fix Applied
+
+Removed inline `//` comment from SOQL `ORDER BY` clause (would have caused compilation failure).
+
+#### Deploy: `0Afaj00000W8jAQCAZ` — 54/54 Succeeded

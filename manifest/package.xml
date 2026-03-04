@@ -74,6 +74,11 @@
     </types>
 
     <types>
+        <members>ReservationManager</members>
+        <name>ApexClass</name>
+    </types>
+
+    <types>
         <members>R6_Diner_Admin</members>
         <name>PermissionSet</name>
     </types>
