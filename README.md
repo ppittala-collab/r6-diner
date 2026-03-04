@@ -47,6 +47,7 @@ r6_diner_agent/
 │   │   ├── Reservation__c/        # Object + 11 fields (transaction record)
 │   │   ├── Restaurant_Table__c/   # Object + 4 fields (physical asset)
 │   │   ├── Restaurant_Slot__c/    # Object + 3 fields (temporal inventory)
+│   │   ├── Menu_Item__c/          # Object + 9 fields (structured menu inventory)
 │   │   └── FAQ__kav/fields/       # 6 custom fields (RAG content)
 │   ├── permissionsets/
 │   │   └── R6_Diner_Admin.permissionset-meta.xml
@@ -55,7 +56,8 @@ r6_diner_agent/
 ├── manifest/
 │   └── package.xml                # Deployment manifest (49 fields, 3 objects, 1 class, 1 permset)
 ├── scripts/apex/
-│   └── MasterSetup.apex           # One-time seed data script (v3.0)
+│   ├── MasterSetup.apex           # One-time seed data script (v3.0)
+│   └── seedMenuItems.apex         # Menu item inventory seed (run after MasterSetup)
 ├── dev-assets/
 │   ├── prd.txt                    # Product Requirements Document (v2.1)
 │   ├── changelog.md               # Full change history
@@ -124,7 +126,7 @@ sf project deploy start \
   --target-org my-r6-org
 ```
 
-Expected result: **54/54 components Succeeded** (49 fields, 3 custom objects, 1 Apex class, 1 permission set).
+Expected result: **64/64 components Succeeded** (58 fields, 4 custom objects, 1 Apex class, 1 permission set).
 
 **Troubleshooting — Common deployment errors:**
 
@@ -162,6 +164,14 @@ The seed script creates a complete test ecosystem: 10 restaurants, 32 tables, 25
 ```bash
 sf apex run \
   --file scripts/apex/MasterSetup.apex \
+  --target-org my-r6-org
+```
+
+Then seed the structured menu items (requires restaurants to exist from Step 7a):
+
+```bash
+sf apex run \
+  --file scripts/apex/seedMenuItems.apex \
   --target-org my-r6-org
 ```
 
@@ -215,6 +225,7 @@ Expected counts: 10 Accounts, 10 Contacts, 32 Tables, 256 Slots, 5 Reservations.
 Account (Restaurant)
   ├── Restaurant_Table__c (1:M via Restaurant__c)
   │     └── Restaurant_Slot__c (1:M via Table__c)
+  ├── Menu_Item__c (1:M via Restaurant__c)  ← structured inventory
   ├── Reservation__c (1:M via Restaurant__c)
   │     ├── Contact__c → Contact (Diner)
   │     ├── Assigned_Table_Slot__c → Restaurant_Slot__c
@@ -249,7 +260,8 @@ The `MasterSetup.apex` script creates test data covering all FSM paths:
 | Diners | 10 | Silver/Gold/Platinum; allergy combos; churn risk; no-show history |
 | Reservations | 5 | Locked, modifiable, pending approval, escalation trigger, VIP |
 | Knowledge | 14 | Policy, Parking; PII Public/Internal/Restricted; confidence 0.35-1.00 |
-| Menus | 10 | 4 detailed + 6 generic; allergen tags throughout |
+| Menu Items | 64 | Structured: 58 available, 6 sold out, 15 vegan, 12 chef picks |
+| Menus (RAG) | 10 | ContentVersion rich text with allergen tags |
 
 ## What's Next (Not Yet Built)
 

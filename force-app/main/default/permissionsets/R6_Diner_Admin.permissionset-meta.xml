@@ -190,6 +190,38 @@
         <readable>true</readable>
     </fieldPermissions>
 
+    <!-- Menu_Item__c fields (non-required only) -->
+    <fieldPermissions>
+        <field>Menu_Item__c.Is_Available__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Menu_Item__c.Allergen_Tags__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Menu_Item__c.Is_Vegan__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Menu_Item__c.Is_Chef_Recommendation__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Menu_Item__c.Last_Inventory_Check__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+    <fieldPermissions>
+        <field>Menu_Item__c.Description__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
+
     <!-- FAQ__kav fields -->
     <fieldPermissions>
         <field>FAQ__kav.Article_Type__c</field>
@@ -243,6 +275,15 @@
     </objectPermissions>
     <objectPermissions>
         <object>Restaurant_Slot__c</object>
+        <allowCreate>true</allowCreate>
+        <allowDelete>true</allowDelete>
+        <allowEdit>true</allowEdit>
+        <allowRead>true</allowRead>
+        <modifyAllRecords>true</modifyAllRecords>
+        <viewAllRecords>true</viewAllRecords>
+    </objectPermissions>
+    <objectPermissions>
+        <object>Menu_Item__c</object>
         <allowCreate>true</allowCreate>
         <allowDelete>true</allowDelete>
         <allowEdit>true</allowEdit>

@@ -13,6 +13,7 @@ Salesforce Agentforce project. API version 65.0. Target org alias: `r6pitt1`.
 - `dev-assets/changelog.md` — Full history of all changes, deployments, and fixes. Update after every deployment.
 - `manifest/package.xml` — Deployment manifest. Must stay in sync with metadata in `force-app/`.
 - `scripts/apex/MasterSetup.apex` — One-time seed data script. Creates 10 restaurants, 32 tables, 256 slots, 10 contacts, 5 reservations, 14 Knowledge articles, 10 menus.
+- `scripts/apex/seedMenuItems.apex` — Menu item seed (run after MasterSetup). Creates 64 structured menu items with availability, allergens, prices.
 - `force-app/main/default/classes/ReservationManager.cls` — Path 1 Transactional action (InvocableMethod).
 
 ## Deployment
@@ -21,6 +22,7 @@ Salesforce Agentforce project. API version 65.0. Target org alias: `r6pitt1`.
 sf project deploy start --manifest manifest/package.xml --target-org <alias>
 sf org assign permset --name R6_Diner_Admin --target-org <alias>
 sf apex run --file scripts/apex/MasterSetup.apex --target-org <alias>
+sf apex run --file scripts/apex/seedMenuItems.apex --target-org <alias>
 ```
 
 ## Critical Gotchas
@@ -32,13 +34,14 @@ sf apex run --file scripts/apex/MasterSetup.apex --target-org <alias>
 5. **rollbackOnError=true is the default.** One failed component rolls back ALL components. Always check the deploy report if component counts look wrong.
 6. **MasterSetup.apex is one-time.** Running it twice creates duplicates. Delete existing data first if re-seeding.
 
-## Data Model (6 Objects, 49 Custom Fields)
+## Data Model (7 Objects, 58 Custom Fields)
 
 - **Account** (Restaurant): 15 fields including `Logic_State__c` formula (calibrated confidence)
 - **Contact** (Diner): 10 fields including `Trust_Tolerance__c`, `Sentiment_Score__c`
 - **Reservation__c**: 11 fields including `Is_Locked__c` formula (1-hr lockout gate)
 - **Restaurant_Table__c**: 4 fields (physical tables linked to Account)
 - **Restaurant_Slot__c**: 3 fields (temporal inventory linked to Table)
+- **Menu_Item__c**: 9 fields (structured menu inventory — availability, allergens, prices)
 - **FAQ__kav**: 6 fields (Knowledge articles for RAG)
 
 ## FSM Paths

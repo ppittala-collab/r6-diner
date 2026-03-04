@@ -55,6 +55,17 @@
         <members>Restaurant_Slot__c.Status__c</members>
         <members>Restaurant_Slot__c.Table__c</members>
 
+        <!-- Menu_Item__c (Structured Menu Inventory) -->
+        <members>Menu_Item__c.Restaurant__c</members>
+        <members>Menu_Item__c.Category__c</members>
+        <members>Menu_Item__c.Price__c</members>
+        <members>Menu_Item__c.Is_Available__c</members>
+        <members>Menu_Item__c.Allergen_Tags__c</members>
+        <members>Menu_Item__c.Is_Vegan__c</members>
+        <members>Menu_Item__c.Is_Chef_Recommendation__c</members>
+        <members>Menu_Item__c.Last_Inventory_Check__c</members>
+        <members>Menu_Item__c.Description__c</members>
+
         <!-- FAQ__kav (RAG Content — org article type) -->
         <members>FAQ__kav.Article_Type__c</members>
         <members>FAQ__kav.Restaurant_Lookup__c</members>
@@ -70,6 +81,7 @@
         <members>Reservation__c</members>
         <members>Restaurant_Table__c</members>
         <members>Restaurant_Slot__c</members>
+        <members>Menu_Item__c</members>
         <name>CustomObject</name>
     </types>
 

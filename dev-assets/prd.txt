@@ -91,6 +91,20 @@ Drives the Agent's persona, personalization, and VIP routing logic.
 * **`Status__c`** (Picklist): `Available`, `Reserved`, `Blocked`. Default: `Available`.
 * **`Table__c`** (Lookup → `Restaurant_Table__c`): The physical table this time slot is assigned to. **Required.**
 
+### 🍽️ Object: `Menu_Item__c` (Structured Menu Inventory)
+
+Provides queryable, per-dish availability and allergen data. Complements `ContentVersion` (rich text for RAG) with structured fields the agent can filter programmatically.
+
+* **`Restaurant__c`** (Lookup → `Account`): The restaurant this item belongs to. **Required.**
+* **`Category__c`** (Picklist): `Starter`, `Main`, `Dessert`, `Drink`, `Side`, `Kids`. Default: `Main`. **Required.**
+* **`Price__c`** (Currency, 2 decimal places): Current menu price. **Required.**
+* **`Is_Available__c`** (Checkbox): Default: `TRUE`. Toggled to `FALSE` when item is sold out or seasonally unavailable. The primary availability gate for agent responses.
+* **`Allergen_Tags__c`** (Multi-Picklist): `Dairy`, `Gluten`, `Nuts`, `Shellfish`, `Eggs`, `Soy`. Default: none. Cross-referenced with `Contact.Allergy_Shellfish__c` and `Contact.Allergy_Nuts__c` in Path 3 safety gate.
+* **`Is_Vegan__c`** (Checkbox): Default: `FALSE`. Quick filter for vegan diner matching.
+* **`Is_Chef_Recommendation__c`** (Checkbox): Default: `FALSE`. Surfaced in Path 3 concierge upsell for Platinum/Gold members.
+* **`Last_Inventory_Check__c`** (DateTime): When availability was last confirmed. Stale checks (> 24 hrs) reduce agent confidence in availability claims, following the same freshness pattern as `Account.Data_Last_Verified__c`.
+* **`Description__c`** (Text Area, 255 chars): Short dish description for agent responses.
+
 ### 📚 Object: `Knowledge__kav` (RAG Unstructured Data)
 
 * **`Article_Type__c`** (Picklist): `Menu`, `Policy`, `Parking`. Default: `Policy`.

@@ -17,11 +17,11 @@
 |---|---|---|
 | `sfdx-project.json` | Ready | API 65.0, default package directory `force-app` |
 | `config/project-scratch-def.json` | Needs update | Missing features for Agentforce, Data Cloud |
-| `manifest/package.xml` | Verified | 49 fields, 3 custom objects, 1 permission set; `FAQ__kav` (org article type) |
+| `manifest/package.xml` | Verified | 58 fields, 4 custom objects, 1 class, 1 permset; `FAQ__kav` (org article type) |
 | `dev-assets/prd.txt` | Deployment-ready | v2.1, all fields fully specified |
 | `dev-assets/changelog.md` | Active | This file |
 | `dev-assets/mvp-plus-backlog.md` | Active | Deferred items organized by priority |
-| Object metadata (XML) | Deployed | 49 field-meta.xml + 3 object-meta.xml + 1 settings file |
+| Object metadata (XML) | Deployed | 58 field-meta.xml + 4 object-meta.xml + 1 settings file |
 | Permission set | Deployed | `R6_Diner_Admin` — full FLS for all custom fields + object CRUD |
 | Knowledge settings | Deployed | `force-app/main/default/settings/Knowledge.settings-meta.xml` |
 | Seed data script | Executed | `scripts/apex/masterSetup.apex` v3.0 — all records seeded in r6pitt1 |
@@ -30,6 +30,7 @@
 | Agentforce config | Not created | Topics, actions, persona prompt all pending |
 | Knowledge articles | Seeded | 14 FAQ__kav articles (10 Policy, 2 Parking, 2 Internal/Restricted PII) published |
 | Menu content | Seeded | 10 ContentVersion files with allergen-enriched menus |
+| Menu items (structured) | Seeded | 64 `Menu_Item__c` records across 10 restaurants (availability + allergens) |
 | LWC components | Not created | None specified in current scope |
 
 ### Verified Field Inventory
@@ -430,3 +431,48 @@ Queries `Restaurant_Slot__c` where:
 Removed inline `//` comment from SOQL `ORDER BY` clause (would have caused compilation failure).
 
 #### Deploy: `0Afaj00000W8jAQCAZ` — 54/54 Succeeded
+
+---
+
+### 2026-03-03 — Menu_Item__c (Structured Menu Inventory)
+
+New custom object providing queryable availability and allergen data per dish, complementing the existing `ContentVersion` rich-text menus used for RAG retrieval.
+
+#### Object: `Menu_Item__c` — 9 fields
+
+| Field | Type | Purpose |
+|---|---|---|
+| `Restaurant__c` | Lookup → Account | Which restaurant (required) |
+| `Category__c` | Picklist | Starter, Main, Dessert, Drink, Side, Kids (required) |
+| `Price__c` | Currency(10,2) | Current menu price (required) |
+| `Is_Available__c` | Checkbox (default TRUE) | Availability toggle — the primary inventory gate |
+| `Allergen_Tags__c` | Multi-Picklist | Dairy, Gluten, Nuts, Shellfish, Eggs, Soy |
+| `Is_Vegan__c` | Checkbox (default FALSE) | Quick vegan filter for Path 3 |
+| `Is_Chef_Recommendation__c` | Checkbox (default FALSE) | Concierge upsell flag |
+| `Last_Inventory_Check__c` | DateTime | Availability freshness — stale > 24 hrs reduces confidence |
+| `Description__c` | TextArea | Short dish description |
+
+#### Seed Data: `scripts/apex/seedMenuItems.apex`
+
+64 menu items across all 10 restaurants:
+
+| Stat | Count |
+|---|---|
+| Total items | 64 |
+| Available | 58 |
+| Sold out (`Is_Available__c = FALSE`) | 6 |
+| Vegan | 15 |
+| Chef recommendations | 12 |
+| Stale inventory (Burger Joint, Forgotten Fondue) | 8 items with `Last_Inventory_Check__c` > 3 days ago |
+
+#### Agent Impact
+
+- **Path 3 (Concierge)**: Can now filter by `Is_Available__c = TRUE` AND `Allergen_Tags__c` excludes diner allergies — structured safety gate replaces regex over plain text
+- **Path 4 (RAG)**: Agent cross-references `Menu_Item__c.Is_Available__c` with `ContentVersion` descriptions
+- **Confidence**: `Last_Inventory_Check__c` follows same freshness pattern as `Data_Last_Verified__c`
+
+#### PRD Updated
+
+Added `Menu_Item__c` section to `dev-assets/prd.txt` between `Restaurant_Slot__c` and `Knowledge__kav`.
+
+#### Deploy: `0Afaj00000W8kBMCAZ` — 64/64 Succeeded
