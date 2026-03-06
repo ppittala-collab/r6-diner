@@ -1,0 +1,427 @@
+config:
+   developer_name: "R6_Diner_MaitreD"
+   default_agent_user: "Agentforce_Service_User"
+   agent_label: "R6 Diner Digital Maitre d'"
+   description: "Fully deterministic orchestrator using Prompt Templates for all reasoning with strict FSM architecture."
+
+system:
+   instructions: |
+      You are the Digital Maitre d', the orchestration layer for the R6 Diner restaurant network.
+      ROLE: You coordinate between Prompt Templates, Actions, and Data Sources.
+   messages:
+      welcome: "Hi, I'm the Digital Maitre d'. I can help with restaurant menus, policies, parking, dress codes, allergen information, and reservations. How can I assist you today?"
+      error: "I'm having trouble connecting to the Diner network. Please try again or ask for a manager."
+
+variables:
+   # ─── Session Variables ───
+   EndUserId: linked string
+      source: @MessagingSession.MessagingEndUserId
+   RoutableId: linked string
+      source: @MessagingSession.Id
+   ContactId: linked string
+      source: @MessagingEndUser.ContactId
+   EndUserLanguage: linked string
+      source: @MessagingSession.EndUserLanguage
+
+   # ─── Mutable State Variables ───
+   VerifiedCustomerId: mutable string
+   UserMessage: mutable string
+   ConversationContext: mutable string
+   ConversationSummary: mutable string
+   ContactSummary: mutable string
+   Route: mutable string
+   RestaurantHint: mutable string
+   Acknowledgment: mutable string
+   RouteProbs: mutable string
+   RouteConfidenceScore: mutable integer
+   RouteConfidenceLabel: mutable string
+   GateMessage: mutable string
+   CurrentRestaurantId: mutable string
+   CurrentRestaurantName: mutable string
+   CurrentLogicState: mutable string
+   TrustGap: mutable string
+   ContactContext: mutable string
+   CommStyle: mutable string
+   AllergyShellfish: mutable string
+   AllergyNuts: mutable string
+   
+   # ─── FSM State & Loop Prevention ───
+   OriginalUserMessage: mutable string
+   ClarificationCount: mutable integer
+      description: "Tracks consecutive clarification loops. Resets to 0 on successful routing."
+   
+   # ─── Escalation State ───
+   EscalationReason: mutable string
+   EscalationPriority: mutable string
+   EscalationFlags: mutable string
+   EscalationOutput: mutable string
+   EscalationAISummary: mutable string
+   EscalationDinerMessage: mutable string
+   ReservationSummary: mutable string
+   EscalateFlag: mutable boolean
+   
+   # ─── RAG & QA State ───
+   KnowledgeArticles: mutable string
+   RestaurantData: mutable string
+   RestaurantDirectoryGrounding: mutable string
+   MenuItems: mutable string
+   PolicyAnswerableScore: mutable string
+   MenuAnswerableScore: mutable string
+   DirectoryAnswerableScore: mutable string
+   ShouldClarify: mutable string
+   FollowupQuestion: mutable string
+   EvidenceUsed: mutable string
+   QAAnswerText: mutable string
+
+# ═══════════════════════════════════════════════════════════════
+# TOPIC SELECTOR (Start Agent)
+# ═══════════════════════════════════════════════════════════════
+start_agent topic_selector:
+   label: "Topic Selector"
+   description: "Classify diner intent via the Intent_Classifier prompt template and route to the correct topic."
+
+   reasoning:
+      actions:
+         # 1. Fetch Contact & Gate Data First
+         - name: build_contact_summary
+           action: @action.Build_Contact_Summary
+           inputs:
+              contactId: "{!@variables.ContactId}"
+           outputs:
+              contactSummary: "{!@variables.ContactSummary}"
+              contactContext: "{!@variables.ContactContext}"
+              commStyle: "{!@variables.CommStyle}"
+              allergyShellfish: "{!@variables.AllergyShellfish}"
+              allergyNuts: "{!@variables.AllergyNuts}"
+              
+         - name: evaluate_hard_gates
+           action: @action.Evaluate_Hard_Gates
+           inputs:
+              contactSummary: "{!@variables.ContactSummary}"
+           outputs:
+              hardGate: "{!@variables.EscalationReason}"
+              gateMessage: "{!@variables.GateMessage}"
+              trustGap: "{!@variables.TrustGap}"
+              
+         # 2. Invoke Intent Classifier ONLY if gates are clear
+         - name: classify_intent_action
+           action: @action.IntentClassifierAction
+           available: |
+              {!@variables.EscalationReason == 'NONE'}
+           inputs:
+              userMessage: "{!@variables.UserMessage}"
+              contactSummary: "{!@variables.ContactSummary}"
+              conversationContext: "{!@variables.ConversationContext}"
+           outputs:
+              route: "{!@variables.Route}"
+              restaurantHint: "{!@variables.RestaurantHint}"
+              acknowledgment: "{!@variables.Acknowledgment}"
+              routeConfidenceScore: "{!@variables.RouteConfidenceScore}"
+              routeConfidenceLabel: "{!@variables.RouteConfidenceLabel}"
+
+   # ─── DETERMINISTIC ROUTING ───
+   
+   # Priority 1: Circuit Breaker for Infinite Loops
+   condition: |
+      {!@variables.ClarificationCount >= 2}
+   transition: topic_escalation
+
+   # Priority 2: Hard Gate Trigger
+   condition: |
+      {!@variables.EscalationReason != 'NONE'}
+   transition: topic_escalation
+
+   # Priority 3: Low Confidence / Ambiguity
+   condition: |
+      {!@variables.RouteConfidenceScore < 55}
+   transition: topic_ambiguous_question
+
+   # Priority 4: Standard Routes
+   condition: |
+      {!@variables.Route == 'ROUTE_POLICY'}
+   transition: topic_policy
+
+   condition: |
+      {!@variables.Route == 'ROUTE_MENU'}
+   transition: topic_menu
+
+   condition: |
+      {!@variables.Route == 'ROUTE_DIRECTORY' || @variables.Route == 'ROUTE_CONCIERGE'}
+   transition: topic_directory
+
+   condition: |
+      {!@variables.Route == 'ROUTE_TRANSACTIONAL' || @variables.Route == 'ROUTE_ESCALATION'}
+   transition: topic_escalation
+
+   condition: |
+      {!@variables.Route == 'ROUTE_OFF_TOPIC'}
+   transition: topic_off_topic
+
+# ═══════════════════════════════════════════════════════════════
+# TOPIC POLICY
+# ═══════════════════════════════════════════════════════════════
+topic topic_policy:
+   label: "Policy QA"
+   description: "Answer policy, parking, dress code, allergen policy questions via Restaurant_Policy_QA."
+
+   reasoning:
+      actions:
+         # 1. Reset loop counter on successful entry
+         - name: reset_state
+           action: @utils.setVariables
+           inputs:
+              ClarificationCount: 0
+              
+         # 2. Restore original question if arriving from disambiguation
+         - name: restore_user_message
+           action: @utils.setVariables
+           available: |
+              {!@variables.OriginalUserMessage != null && @variables.OriginalUserMessage != ''}
+           inputs:
+              UserMessage: "{!@variables.OriginalUserMessage}"
+              OriginalUserMessage: ""
+              
+         # 3. Fetch Data & Invoke Prompt
+         - name: get_restaurant
+           action: @action.Get_Restaurant
+           inputs:
+              name: "{!@variables.RestaurantHint}"
+           outputs:
+              CurrentRestaurantName: "{!@variables.CurrentRestaurantName}"
+              CurrentLogicState: "{!@variables.CurrentLogicState}"
+              
+         - name: build_contact_context
+           action: @action.Build_Contact_Context
+           inputs:
+              contactSummary: "{!@variables.ContactSummary}"
+              trustGap: "{!@variables.TrustGap}"
+              allergyShellfish: "{!@variables.AllergyShellfish}"
+              allergyNuts: "{!@variables.AllergyNuts}"
+           outputs:
+              contactContext: "{!@variables.ContactContext}"
+
+         - name: invoke_policy_qa
+           action: @promptTemplate.Restaurant_Policy_QA
+           inputs:
+              restaurant_name: "{!@variables.CurrentRestaurantName}"
+              user_question: "{!@variables.UserMessage}"
+              logic_state: "{!@variables.CurrentLogicState}"
+              knowledge_articles: "{!@variables.KnowledgeArticles}"
+              contact_context: "{!@variables.ContactContext}"
+           outputs:
+              answer_text: "{!@variables.QAAnswerText}"
+              should_clarify: "{!@variables.FollowupQuestion}" 
+              escalate_flag: "{!@variables.EscalateFlag}"
+              escalate_reason: "{!@variables.EscalationReason}"
+
+   # Escalate if the evidence gate failed
+   condition: |
+      {!@variables.EscalateFlag == true}
+   transition: topic_escalation
+
+# ═══════════════════════════════════════════════════════════════
+# TOPIC MENU
+# ═══════════════════════════════════════════════════════════════
+topic topic_menu:
+   label: "Menu QA"
+   description: "Answer menu, food, vegan, price, allergen questions via Menu_Retrieval_QA."
+
+   reasoning:
+      actions:
+         - name: reset_state
+           action: @utils.setVariables
+           inputs:
+              ClarificationCount: 0
+              
+         - name: restore_user_message
+           action: @utils.setVariables
+           available: |
+              {!@variables.OriginalUserMessage != null && @variables.OriginalUserMessage != ''}
+           inputs:
+              UserMessage: "{!@variables.OriginalUserMessage}"
+              OriginalUserMessage: ""
+              
+         - name: get_restaurant
+           action: @action.Get_Restaurant
+           inputs:
+              name: "{!@variables.RestaurantHint}"
+           outputs:
+              CurrentRestaurantName: "{!@variables.CurrentRestaurantName}"
+              CurrentLogicState: "{!@variables.CurrentLogicState}"
+              CurrentRestaurantId: "{!@variables.CurrentRestaurantId}"
+              
+         - name: build_contact_context
+           action: @action.Build_Contact_Context
+           inputs:
+              contactSummary: "{!@variables.ContactSummary}"
+              trustGap: "{!@variables.TrustGap}"
+              allergyShellfish: "{!@variables.AllergyShellfish}"
+              allergyNuts: "{!@variables.AllergyNuts}"
+           outputs:
+              contactContext: "{!@variables.ContactContext}"
+              
+         - name: query_menu_items
+           action: @action.Query_Menu_Items
+           inputs:
+              restaurantId: "{!@variables.CurrentRestaurantId}"
+              restaurantName: "{!@variables.CurrentRestaurantName}"
+           outputs:
+              menuData: "{!@variables.MenuItems}"
+              
+         - name: invoke_menu_qa
+           action: @promptTemplate.Menu_Retrieval_QA
+           inputs:
+              restaurant_name: "{!@variables.CurrentRestaurantName}"
+              user_question: "{!@variables.UserMessage}"
+              logic_state: "{!@variables.CurrentLogicState}"
+              menu_items: "{!@variables.MenuItems}"
+              contact_context: "{!@variables.ContactContext}"
+           outputs:
+              answer_text: "{!@variables.QAAnswerText}"
+              should_clarify: "{!@variables.FollowupQuestion}" 
+              escalate_flag: "{!@variables.EscalateFlag}"
+              escalate_reason: "{!@variables.EscalationReason}"
+
+   condition: |
+      {!@variables.EscalateFlag == true}
+   transition: topic_escalation
+
+# ═══════════════════════════════════════════════════════════════
+# TOPIC DIRECTORY
+# ═══════════════════════════════════════════════════════════════
+topic topic_directory:
+   label: "Directory QA"
+   description: "Answer network-wide directory questions via Restaurant_Directory_QA."
+
+   reasoning:
+      actions:
+         - name: reset_state
+           action: @utils.setVariables
+           inputs:
+              ClarificationCount: 0
+              
+         - name: restore_user_message
+           action: @utils.setVariables
+           available: |
+              {!@variables.OriginalUserMessage != null && @variables.OriginalUserMessage != ''}
+           inputs:
+              UserMessage: "{!@variables.OriginalUserMessage}"
+              OriginalUserMessage: ""
+              
+         - name: invoke_directory_qa
+           action: @promptTemplate.Restaurant_Directory_QA
+           inputs:
+              user_question: "{!@variables.UserMessage}"
+              restaurant_data: "{!@variables.RestaurantData}"
+              contact_summary: "{!@variables.ContactSummary}"
+           outputs:
+              answer_text: "{!@variables.QAAnswerText}"
+              should_clarify: "{!@variables.FollowupQuestion}" 
+              escalate_flag: "{!@variables.EscalateFlag}"
+              escalate_reason: "{!@variables.EscalationReason}"
+
+   condition: |
+      {!@variables.EscalateFlag == true}
+   transition: topic_escalation
+
+# ═══════════════════════════════════════════════════════════════
+# AMBIGUOUS QUESTION
+# ═══════════════════════════════════════════════════════════════
+topic topic_ambiguous_question:
+   label: "Ambiguous Question"
+   description: "Ask ONE clarifying question and track loop count."
+
+   reasoning:
+      actions:
+         - name: generate_clarification
+           action: @promptTemplate.Ambiguous_Clarifier
+           inputs:
+              user_message: "{!@variables.OriginalUserMessage}"
+              restaurant_directory_grounding: "{!@variables.RestaurantDirectoryGrounding}"
+              comm_style: "{!@variables.CommStyle}"
+              followup_question: "{!@variables.FollowupQuestion}"
+
+   # Yield to the diner while saving state. NO transitions here!
+   after_reasoning:
+      - name: update_disambiguation_state
+        action: @action.Build_Disambiguation_Context
+        inputs:
+           existingContext: "{!@variables.ConversationContext}"
+           originalUserMessage: "{!@variables.OriginalUserMessage}"
+           followupQuestion: "{!@variables.FollowupQuestion}"
+           currentClarificationCount: "{!@variables.ClarificationCount}"
+        outputs:
+           conversationContext: "{!@variables.ConversationContext}"
+           newClarificationCount: "{!@variables.ClarificationCount}"
+
+# ═══════════════════════════════════════════════════════════════
+# ESCALATION
+# ═══════════════════════════════════════════════════════════════
+topic topic_escalation:
+   label: "Escalation"
+   description: "Determine priority, generate handoff summary/message, and transfer to human concierge."
+
+   reasoning:
+      actions:
+         # 1. Map the Loop Breaker to the prompt template trigger
+         - name: set_loop_trigger
+           action: @utils.setVariables
+           available: |
+              {!@variables.ClarificationCount >= 2}
+           inputs:
+              EscalationReason: "CLARIFICATION_LOOP"
+
+         # 2. Setup Context
+         - name: ensure_conversation_summary
+           action: @utils.setVariables
+           available: |
+              {!@variables.ConversationSummary == null || @variables.ConversationSummary == ''}
+           inputs:
+              ConversationSummary: "{!@variables.ConversationContext}"
+
+         - name: get_diner_history
+           action: @action.Get_Diner_History
+           inputs:
+              contactId: "{!@variables.ContactId}"
+           outputs:
+              reservationSummary: "{!@variables.ReservationSummary}"
+              
+         # 3. Prioritize & Execute
+         - name: determine_esc_priority
+           action: @action.Determine_Escalation_Priority
+           inputs:
+              contactSummary: "{!@variables.ContactSummary}"
+              escalationTrigger: "{!@variables.EscalationReason}"
+           outputs:
+              priority: "{!@variables.EscalationPriority}"
+              flags: "{!@variables.EscalationFlags}"
+              
+         - name: prepare_handoff
+           action: @promptTemplate.Escalation_Handler
+           inputs:
+              escalation_trigger: "{!@variables.EscalationReason}"
+              routing_priority: "{!@variables.EscalationPriority}"
+              routing_flags: "{!@variables.EscalationFlags}"
+              contact_summary: "{!@variables.ContactSummary}"
+              conversation_summary: "{!@variables.ConversationSummary}"
+              restaurant_name: "{!@variables.CurrentRestaurantName}"
+              logic_state: "{!@variables.CurrentLogicState}"
+              reservation_summary: "{!@variables.ReservationSummary}"
+              comm_style: "{!@variables.CommStyle}"
+           outputs:
+              output: "{!@variables.EscalationOutput}"
+
+   after_reasoning:
+      - name: execute_transfer
+        action: @utils.escalate
+
+# ═══════════════════════════════════════════════════════════════
+# OFF TOPIC
+# ═══════════════════════════════════════════════════════════════
+topic topic_off_topic:
+   label: "Off Topic"
+   description: "Redirect off-topic questions."
+   
+   reasoning:
+      instructions: |
+         Respond in exactly one sentence: "I can help with R6 Diner restaurant menus, policies, parking, dress codes, allergen info, and reservations. Which restaurant are you asking about?"

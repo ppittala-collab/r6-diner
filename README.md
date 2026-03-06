@@ -7,16 +7,26 @@ An Agentforce-powered restaurant reservation system built on Salesforce. The age
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Agentforce Agent                         │
-│                  "Digital Maitre d'"                        │
+│              "Digital Maitre d'" (Orchestrator)             │
 ├──────────┬──────────┬──────────────┬────────────────────────┤
 │  Path 1  │  Path 2  │   Path 3     │        Path 4          │
 │ Transact │ Escalate │  Concierge   │     RAG/Knowledge      │
 │ Modify/  │ Human    │  Recommend   │     FAQ/Menu/Policy    │
 │ Cancel   │ Handoff  │  + Upsell    │                        │
-├──────────┴──────────┴──────────────┴────────────────────────┤
+├──────────┴──────────┴──────────────┼────────────────────────┤
+│                                    │   Prompt Templates     │
+│                                    │  ┌──────────────────┐  │
+│                                    │  │ Policy QA        │  │
+│                                    │  │ Menu QA          │  │
+│                                    │  │ Directory QA     │  │
+│                                    │  └──────────────────┘  │
+├────────────────────────────────────┴────────────────────────┤
 │           Calibrated Confidence Engine                      │
 │   Logic_State__c: DETERMINISTIC | PROBABILISTIC |           │
 │                   DEGRADED | SPECULATIVE | STALE            │
+├─────────────────────────────────────────────────────────────┤
+│   Data: Knowledge (FAQ__kav) │ Menu_Item__c │ Data Library  │
+│   Retrieval: Apex Actions │ Native Get Record │ RAG         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -40,7 +50,8 @@ sf version
 r6_diner_agent/
 ├── force-app/main/default/
 │   ├── classes/                    # Apex classes
-│   │   └── ReservationManager.cls  # Path 1: Transactional modify/cancel
+│   │   ├── ReservationManager.cls  # Path 1: Transactional modify/cancel
+│   │   └── QueryMenuItems.cls      # Invocable: search menu items with filters
 │   ├── objects/                    # Custom objects & fields
 │   │   ├── Account/fields/        # 15 custom fields (restaurant metadata)
 │   │   ├── Contact/fields/        # 10 custom fields (diner profile)
@@ -54,14 +65,29 @@ r6_diner_agent/
 │   └── settings/
 │       └── Knowledge.settings-meta.xml
 ├── manifest/
-│   └── package.xml                # Deployment manifest (49 fields, 3 objects, 1 class, 1 permset)
+│   └── package.xml                # Deployment manifest
 ├── scripts/apex/
 │   ├── MasterSetup.apex           # One-time seed data script (v3.0)
 │   └── seedMenuItems.apex         # Menu item inventory seed (run after MasterSetup)
 ├── dev-assets/
 │   ├── prd.txt                    # Product Requirements Document (v2.1)
 │   ├── changelog.md               # Full change history
-│   └── mvp-plus-backlog.md        # Deferred features backlog
+│   ├── agent-prompts.md           # FSM path prompts & field usage matrix
+│   ├── agentforce-setup-checklist.md  # Manual Agentforce UI setup guide
+│   ├── er-diagram.md              # Mermaid ER diagram
+│   ├── mvp-plus-backlog.md        # Deferred features backlog
+│   ├── data-library/              # Grounding files for Agentforce Data Library
+│   │   ├── r6_restaurant_directory.txt
+│   │   ├── r6_allergen_safety_guide.txt
+│   │   └── r6_membership_and_policies.txt
+│   └── prompt-templates/          # Prompt content for manual Prompt Builder input
+│       ├── 1_intent_classifier.txt
+│       ├── 2_restaurant_policy_qa.txt
+│       ├── 3_menu_retrieval_qa.txt
+│       ├── 4_restaurant_directory_qa.txt
+│       ├── 5_escalation_handler.txt
+│       ├── 6_ambiguous_clarifier.txt
+│       └── 7_auth_passcode_prompt.txt
 └── sfdx-project.json              # API version 65.0
 ```
 
@@ -126,7 +152,9 @@ sf project deploy start \
   --target-org my-r6-org
 ```
 
-Expected result: **64/64 components Succeeded** (58 fields, 4 custom objects, 1 Apex class, 1 permission set).
+Expected result: **65/65 components Succeeded** (58 fields, 4 custom objects, 2 Apex classes, 1 permission set).
+
+> **Note:** Prompt Templates are created manually in Prompt Builder (see Step 8b below and `dev-assets/prompt-templates/` for the content).
 
 **Troubleshooting — Common deployment errors:**
 
@@ -175,7 +203,9 @@ sf apex run \
   --target-org my-r6-org
 ```
 
-**Important:** This is a one-time script. Running it again will create duplicate records. If you need to re-seed, delete the existing data first:
+**For existing orgs with seed data:** After deploying `Contact.Passcode__c`, run `scripts/apex/updatePasscodeDefault.apex` to set Passcode__c = First3(FirstName) + '123456' on existing contacts.
+
+**Important:** MasterSetup is a one-time script. Running it again will create duplicate records. If you need to re-seed, delete the existing data first:
 
 ```bash
 # Delete in dependency order (children before parents)
@@ -263,13 +293,29 @@ The `MasterSetup.apex` script creates test data covering all FSM paths:
 | Menu Items | 64 | Structured: 58 available, 6 sold out, 15 vegan, 12 chef picks |
 | Menus (RAG) | 10 | ContentVersion rich text with allergen tags |
 
+### Step 8b: Create Prompt Templates (Manual)
+
+The 6 prompt templates must be created manually in Prompt Builder. Each text file in `dev-assets/prompt-templates/` contains:
+- Template type, name, API name, and description (top section)
+- Required and optional inputs with their types
+- The full prompt content to paste into Prompt Builder
+
+Create them in order:
+1. **Intent Classifier** — Topic Selector routing logic
+2. **Restaurant Policy QA** — Knowledge article answering
+3. **Menu Retrieval QA** — Menu_Item__c answering
+4. **Restaurant Directory QA** — Network-wide directory
+5. **Escalation Handler** — Path 2 human handoff
+6. **Ambiguous Clarifier** — Disambiguation
+7. **Auth Passcode Prompt** — Passcode verification gate (only authenticated users can escalate)
+
+See `dev-assets/agentforce-setup-checklist.md` for detailed step-by-step instructions including input mapping and agent wiring.
+
 ## What's Next (Not Yet Built)
 
 These components are referenced in the PRD but not yet implemented:
 
 - **Route_to_Human_Flow** — Flow for Path 2 escalation routing to `Tier_2_Human_Concierge` queue
-- **Agentforce Topics & Actions** — Agent configuration connecting the FSM paths
-- **System Persona Prompt** — Flex Template embedding the Calibrated Confidence table
 - **Data Cloud integration** — Unified Profile ingestion, Vector Search Index
 - **Einstein Trust Layer config** — PII masking rules based on `PII_Sensitivity__c`
 

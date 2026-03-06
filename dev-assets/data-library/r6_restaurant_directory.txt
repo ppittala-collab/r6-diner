@@ -1,0 +1,212 @@
+R6 DINER NETWORK — RESTAURANT DIRECTORY
+========================================
+Last Updated: 2026-03-04
+
+This document contains the complete directory of all R6 Diner network restaurants, their operational details, policies, allergen safety information, and dining guidelines. Use this as the primary grounding source for restaurant-level questions.
+
+---
+
+RESTAURANT: Le Petit Bistro
+Aliases: petit, bistro, french, la petit, le petit
+Cuisine: French
+Price Tier: $$$ (Fine Dining)
+Vibe: Romantic, Upscale
+Family Friendly: No
+Allergen Safety: Shellfish-free kitchen
+Safety Certification: None listed
+Average Dining Duration: 120 minutes
+Grace Period: 15 minutes (reservation released after grace period)
+Inventory Buffer: 0%
+Dress Code: Formal attire required. Jackets preferred for gentlemen.
+Cancellation Policy: Free cancellation up to 24 hours in advance. Late cancellations incur a $50 per person fee.
+Special Features: Complimentary champagne toast for birthdays with 48-hour advance notice.
+Parking: Complimentary valet parking available Thursday through Sunday evenings. Street parking on Elm St (metered until 8 PM). Nearest garage: City Center Garage, 2 blocks east ($12 flat rate after 5 PM).
+Best For: Anniversaries, intimate dinners, special occasions.
+
+---
+
+RESTAURANT: Pasta Palace
+Aliases: pasta, palace, italian
+Cuisine: Italian
+Price Tier: $$ (Moderate)
+Vibe: Family-Friendly, Casual
+Family Friendly: Yes
+Allergen Safety: Nut-free preparation area available
+Safety Certification: None listed
+Average Dining Duration: 90 minutes
+Grace Period: 15 minutes
+Inventory Buffer: 10%
+Dress Code: Casual. Come as you are!
+Family Amenities: High chairs, booster seats, coloring books, kids menu available.
+Group Bookings: Parties of 8 or more receive a complimentary antipasto platter.
+Happy Hour: Monday through Thursday 4-6 PM, half-price appetizers.
+Best For: Family dinners, group celebrations, casual Italian dining.
+
+---
+
+RESTAURANT: Sushi Zen
+Aliases: sushi, zen, japanese, sakura
+Cuisine: Japanese
+Price Tier: $$$ (Upscale)
+Vibe: Business-Quiet, Upscale
+Family Friendly: No
+Allergen Safety: Nut-free preparation available upon request
+Safety Certification: None listed
+Average Dining Duration: 90 minutes
+Grace Period: 10 minutes
+Inventory Buffer: 5%
+Dress Code: Smart casual.
+IMPORTANT ALLERGEN WARNING: Kitchen handles shellfish extensively. Cannot guarantee a shellfish-free environment. Guests with shellfish allergies should exercise caution.
+Omakase: Chef's tasting menu available at the sushi bar (reservation required, 2 guests maximum).
+Sake Pairing: Premium sake flight available for $45.
+Best For: Business dinners, date nights, Japanese cuisine enthusiasts.
+
+---
+
+RESTAURANT: The Burger Joint
+Aliases: burger, joint, american
+Cuisine: American
+Price Tier: $ (Budget-Friendly)
+Vibe: Trendy, Casual
+Family Friendly: Yes
+Allergen Safety: None specified
+Safety Certification: None listed
+Average Dining Duration: 45 minutes
+Grace Period: 5 minutes
+Inventory Buffer: 20%
+Dress Code: Casual.
+Reservations: Primarily walk-in. Reservations are subject to staff confirmation.
+Payment: All major credit cards and cash accepted.
+Wait Times: Average 20-30 minutes during peak hours (Friday/Saturday 6-8 PM).
+NOTE: Data for this restaurant has moderate confidence (Reliability Score: 2). Information should be treated as approximate.
+Best For: Quick casual meals, burger lovers, walk-in dining.
+
+---
+
+RESTAURANT: Forgotten Fondue
+Aliases: fondue, forgotten
+Cuisine: French
+Price Tier: $$ (Moderate)
+Vibe: Romantic
+Family Friendly: No
+Allergen Safety: None specified
+Safety Certification: None listed
+Average Dining Duration: 90 minutes
+Grace Period: 15 minutes
+Inventory Buffer: 50%
+Dress Code: Smart casual.
+Seating Policy: Full party must be present before seating. No partial seating.
+WARNING: Data for this restaurant has NOT been updated in over 7 days. All information should be verified directly with the restaurant before being shared with guests. Agent should offer human handoff for any questions about this restaurant.
+Best For: Fondue dining (when data is current).
+
+---
+
+RESTAURANT: Vibe Vegan
+Aliases: vibe, vegan, plant
+Cuisine: Vegan
+Price Tier: $$ (Moderate)
+Vibe: Trendy, Outdoor-Dining
+Family Friendly: No
+Allergen Safety: Nut-free certified, Shellfish-free
+Safety Certification: Nut-Free Certified
+Average Dining Duration: 60 minutes
+Grace Period: 10 minutes
+Inventory Buffer: 0%
+Dress Code: Casual.
+Allergen Certifications: 100% Nut-Free Certified kitchen. Shellfish-free. All dishes are vegan and free from the top 8 allergens.
+Sourcing: Organic, locally sourced produce. Carbon-neutral kitchen.
+Patio: Dog-friendly outdoor seating available.
+Best For: Vegan diners, allergy-conscious guests, eco-friendly dining.
+
+---
+
+RESTAURANT: Taco Tequila
+Aliases: taco, tequila, mexican
+Cuisine: Mexican
+Price Tier: $ (Budget-Friendly)
+Vibe: Casual, Live-Music
+Family Friendly: Yes (but adults only after 9 PM)
+Allergen Safety: None specified
+Safety Certification: None listed
+Average Dining Duration: 60 minutes
+Grace Period: 10 minutes
+Inventory Buffer: 15%
+Dress Code: Casual.
+Age Policy: Adults only after 9 PM during live music events.
+Specialty: Tableside guacamole and margarita flights.
+Patio: Outdoor seating available, first-come first-served.
+Best For: Casual Mexican dining, live music nights, group outings.
+
+---
+
+RESTAURANT: Curry House
+Aliases: curry, indian, spice
+Cuisine: Indian
+Price Tier: $$ (Moderate)
+Vibe: Family-Friendly, Casual
+Family Friendly: Yes
+Allergen Safety: None specified
+Safety Certification: Certified Halal
+Average Dining Duration: 90 minutes
+Grace Period: 15 minutes
+Inventory Buffer: 0%
+Dress Code: Smart casual.
+Halal Certification: Certified Halal kitchen. All meats are halal-sourced.
+Spice Levels: Dishes range from Mild (1) to Volcanic (10). Staff will guide you.
+Vegetarian: Extensive vegetarian and vegan menu section available.
+Family Special: Kids eat free on Sundays with a paying adult.
+Best For: Indian cuisine lovers, halal dining, family meals.
+
+---
+
+RESTAURANT: Steak & Stone
+Aliases: steak, stone, steakhouse
+Cuisine: Steakhouse
+Price Tier: $$$$ (Premium)
+Vibe: Business-Quiet, Upscale
+Family Friendly: No
+Allergen Safety: None specified
+Safety Certification: HACCP Compliant
+Average Dining Duration: 120 minutes
+Grace Period: 20 minutes
+Inventory Buffer: 0%
+Dress Code: Formal. Jackets required. No athletic wear.
+Private Dining: Private booths available for business meetings (seats 2-6).
+Wine Program: Sommelier-curated wine list with 200+ selections.
+Platinum Members: Complimentary champagne and priority seating.
+Wagyu: A5 Japanese Wagyu available at market price (48-hour advance order required).
+Parking: Complimentary valet for all guests. Self-park available in attached underground garage (Level B2, validated). Platinum members receive priority valet with dedicated lane.
+Best For: Business entertaining, special celebrations, premium steakhouse experience.
+
+---
+
+RESTAURANT: Dim Sum Garden
+Aliases: dim sum, garden, chinese, dumpling
+Cuisine: Chinese
+Price Tier: $$ (Moderate)
+Vibe: Family-Friendly, Casual
+Family Friendly: Yes
+Allergen Safety: None specified
+Safety Certification: None listed
+Average Dining Duration: 60 minutes
+Grace Period: 10 minutes
+Inventory Buffer: 10%
+Dress Code: Casual.
+Service Style: Rapid dim sum cart service. Dishes arrive in 3-5 minute intervals.
+Group Specialty: Ideal for large parties (8 or more). Lazy Susan tables available.
+Tea Service: Complimentary jasmine tea with every table.
+Best For: Group dining, dim sum lovers, family gatherings.
+
+---
+
+CONFIDENCE STATES REFERENCE
+============================
+Each restaurant's data trustworthiness is calculated automatically:
+
+- DETERMINISTIC: Data verified within last 4 hours, maximum reliability. Agent can answer with full confidence.
+- PROBABILISTIC: Data verified within 24 hours, good reliability. Agent should mention verification time.
+- DEGRADED: High reliability score but data older than 24 hours. Agent should note data staleness.
+- SPECULATIVE: Low reliability score. Agent should suggest confirming with restaurant.
+- STALE: Data older than 7 days. Agent must NOT answer. Offer human handoff immediately.
+
+Current restaurant states will vary based on when Data_Last_Verified__c was last updated.

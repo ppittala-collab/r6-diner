@@ -1,0 +1,650 @@
+Below is a **state–transition oriented explanation** of each diagram. I focus on **states (S), decisions (D), transitions (T), and terminal states**, which is the language typically used in **agentic workflow orchestration, conversational state machines, and Salesforce Agentforce architecture reviews**.
+
+I reference the uploaded diagrams where relevant.
+
+---
+
+# 1. Concierge Path — Personalized Dining Recommendations
+
+📄 
+
+This workflow handles **recommendation requests** and transitions into reservation creation if the user accepts.
+
+---
+
+## Initial State
+
+### **S0 — Intent Detection**
+
+**State:**
+User asks for a dining recommendation.
+
+Example input:
+
+> “Recommend a good place for dinner tonight.”
+
+**Transition**
+
+* **T_INTENT** → Route to `Dining_Concierge` topic.
+
+---
+
+## Authentication Stage
+
+### **S1 — Authentication Check**
+
+**State:**
+The agent verifies whether the user session is authenticated.
+
+**Decision**
+
+* **D1_IsAuth**
+
+**Transitions**
+
+* **Yes → S3 (Profile Retrieval)**
+* **No → S2 (Generic Recommendation)**
+
+---
+
+## Profile Context Retrieval
+
+### **S3 — Fetch Customer Profile**
+
+**State:**
+Retrieve **Customer 360 profile data** from Data Cloud.
+
+Typical attributes retrieved:
+
+* Cuisine preferences
+* Dietary restrictions
+* Favorite restaurants
+* Budget range
+
+**Transition**
+
+* **T_PROFILE_RETRIEVED → S3b**
+
+---
+
+### **S3b — Fetch Restaurant Inventory**
+
+**State:**
+Query backend inventory system to retrieve **real-time restaurant availability**.
+
+Data retrieved:
+
+* Available tables
+* Time slots
+* Capacity
+
+**Transition**
+
+* **T_INVENTORY_RETRIEVED → S4**
+
+---
+
+## Recommendation Generation
+
+### **S4 — Prompt Execution**
+
+**State:**
+Execute `Personalized_Dining_Prompt`.
+
+Inputs to LLM:
+
+* Customer profile
+* Available restaurants
+* Dining context
+
+**Transition**
+
+* Context passed to safety layer.
+
+---
+
+### **S5 — Trust Layer Filtering**
+
+**State:**
+Einstein Trust Layer validates the prompt and output context.
+
+Checks include:
+
+* PII masking
+* Data leakage detection
+* Policy filtering
+
+**Decision**
+
+* **D2_MaskingOK**
+
+**Transitions**
+
+* **Clean → S6**
+* **Unsafe/Toxic → P3_EndEsc**
+
+---
+
+### **S6 — LLM Synthesis**
+
+**State:**
+The LLM generates a recommendation.
+
+Constraint:
+
+* Only recommend restaurants with **confirmed availability**.
+
+**Transition**
+
+* **T_RESPONSE_GENERATED → S7**
+
+---
+
+### **S7 — Recommendation Output**
+
+**State:**
+The agent returns a recommendation to the user.
+
+Example:
+
+> “Le Petit has tables available tonight and matches your preference for French cuisine.”
+
+**Transition**
+
+* Ask booking confirmation.
+
+---
+
+## User Decision
+
+### **D3_UserAccepts**
+
+User chooses whether to book the recommended restaurant.
+
+**Transitions**
+
+* **Yes → S8 (Transition to Transactional Path)**
+* **No → S2 (Generic Recommendation)**
+
+---
+
+### **S8 — Path Transition**
+
+**State:**
+The system transitions into **Path 1: Reservation Transaction Flow**.
+
+---
+
+## Terminal States
+
+| State                 | Description                |
+| --------------------- | -------------------------- |
+| **Session Complete**  | User declines booking      |
+| **Path 1 Transition** | Reservation flow triggered |
+
+---
+
+# 2. Escalation Path — Human Handoff
+
+📄 
+
+This path ensures **safe escalation when the AI should not respond**.
+
+---
+
+## Initial State
+
+### **S0_Input**
+
+**State:**
+A user message arrives during a conversation.
+
+---
+
+### **S1_Evaluation**
+
+**State:**
+The agent evaluates the message using classification.
+
+Possible signals:
+
+* explicit request for human agent
+* safety risk
+* unsupported intent
+
+---
+
+## Decision
+
+### **D1_Eval**
+
+**Transitions**
+
+| Condition              | Transition                |
+| ---------------------- | ------------------------- |
+| Explicit human request | Escalation                |
+| High risk intent       | Escalation                |
+| Normal intent          | Return to main agent path |
+
+---
+
+### **Normal Intent**
+
+Transition:
+
+* **T_NORMAL → S1_NormalTopic**
+
+User returns to one of the main paths:
+
+* Transaction
+* Concierge
+* RAG
+
+---
+
+## Escalation Pipeline
+
+### **S2 — Route to Escalation Topic**
+
+Agent routes to:
+
+`Escalation_and_Human_Handoff`
+
+Topic constraints enforce:
+
+* bypass LLM generation
+* structured routing
+
+---
+
+### **S3 — Circuit Breaker**
+
+**State:**
+LLM reasoning is disabled to avoid hallucination.
+
+Instead the system prepares for **deterministic handoff**.
+
+---
+
+### **S3b — Conversation Summary**
+
+Agent generates a structured summary:
+
+* user request
+* previous conversation
+* intent classification
+
+This summary is passed to human agents.
+
+---
+
+### **S4 — Execute Routing Flow**
+
+The system runs a **custom routing flow** that determines:
+
+* support queue
+* escalation category
+* case metadata
+
+---
+
+## Decision: Agent Availability
+
+### **D2_FlowOK**
+
+| Condition     | Transition       |
+| ------------- | ---------------- |
+| Agents online | Graceful handoff |
+| Outside hours | Async fallback   |
+
+---
+
+## Human Handoff
+
+### **S5a — Live Handoff**
+
+Agent message:
+
+> “Connecting you with a specialist now.”
+
+Control transitions to a human agent.
+
+---
+
+### **S5b — Async Ticket Creation**
+
+If agents are unavailable:
+
+* Create support case
+* Notify user
+
+Example message:
+
+> “Our team will contact you shortly.”
+
+---
+
+## Terminal State
+
+**Human agent or ticket created**
+
+---
+
+# 3. RAG Path — Policy and FAQ Retrieval
+
+📄 
+
+This path handles **knowledge retrieval queries**.
+
+Example:
+
+* dress code
+* parking
+* allergy policy
+
+---
+
+## Initial State
+
+### **S0 — Intent Detection**
+
+User asks a policy question.
+
+Example:
+
+> “What is the restaurant dress code?”
+
+Transition:
+
+* **T_INTENT → Restaurant_Policies_FAQ topic**
+
+---
+
+### **S1 — Intent Classification**
+
+The request is classified as **knowledge retrieval**.
+
+---
+
+## Retrieval Phase
+
+### **S2 — Semantic Search**
+
+Agent queries **Data Cloud vector database**.
+
+Search returns:
+
+* knowledge chunks
+* FAQ documents
+
+---
+
+### **D1_ChunksFound**
+
+Decision:
+
+| Condition    | Transition                 |
+| ------------ | -------------------------- |
+| Chunks found | Generate grounded response |
+| No match     | Clarification              |
+
+---
+
+## No Data Path
+
+### **S3 — Graceful Pivot**
+
+Agent responds:
+
+> “I don’t have that information. Would you like me to connect you with someone?”
+
+---
+
+### **D3_UserChoice**
+
+| Choice               | Transition         |
+| -------------------- | ------------------ |
+| Ask another question | Loop back to start |
+| Escalate             | Path 2             |
+
+---
+
+## Grounded Generation Path
+
+### **S4 — Context Preparation**
+
+Retrieved knowledge chunks are injected into the LLM prompt.
+
+---
+
+### **S5 — Grounding Guardrail**
+
+Guardrail ensures:
+
+* no hallucinated URLs
+* only retrieved knowledge used
+
+---
+
+### **D2_URLAttempt**
+
+Check if model attempted to generate fake links.
+
+---
+
+### **S6 — Interception**
+
+If violation detected:
+
+* remove fake link
+* enforce safe response
+
+---
+
+### **S7 — Response Synthesis**
+
+LLM generates a grounded answer.
+
+Example:
+
+> “The restaurant dress code is Smart Casual.”
+
+---
+
+### **S8 — Output**
+
+FAQ resolved.
+
+Target KPI:
+
+**>80% First Contact Resolution**
+
+---
+
+# 4. Transactional Path — Reservation Management
+
+📄 
+
+This path executes **reservation changes, cancellations, or creation**.
+
+---
+
+# Initial State
+
+### **S0 — Reservation Intent**
+
+User intent detected:
+
+`RESERVATION_MGMT`
+
+Examples:
+
+* “Cancel my booking”
+* “Change reservation time”
+
+---
+
+## Authentication
+
+### **S1 — Authentication**
+
+Verify user identity via passcode.
+
+* User provides passcode from their Contact record.
+* System compares against Contact.Passcode__c (format: first 3 letters of FirstName + 123456, e.g., Sof123456).
+* Only authenticated users can be escalated to human agents — limits spam and non-priority escalations.
+
+---
+
+### **D1_AuthOK**
+
+| Condition | Transition       |
+| --------- | ---------------- |
+| Success   | Retrieve booking |
+| Failure   | Retry / lock     |
+
+---
+
+## Booking Retrieval
+
+### **S2 — Retrieve Booking**
+
+Agent queries database for confirmed reservations.
+
+---
+
+### **D2_Found**
+
+| Condition | Transition     |
+| --------- | -------------- |
+| Found     | Select booking |
+| None      | Inform user    |
+
+---
+
+## Modification Flow
+
+### **S3 — User Selects Action**
+
+User chooses:
+
+* Cancel
+* Modify
+
+---
+
+### **S3b — Fetch Available Slots**
+
+System queries reservation inventory.
+
+---
+
+### **S3c — Select New Time**
+
+User selects new reservation slot.
+
+---
+
+### **S4 — Policy Gate**
+
+Check business rule:
+
+Example:
+
+* No changes within **1 hour**.
+
+---
+
+### **D4_Locked**
+
+| Condition | Transition     |
+| --------- | -------------- |
+| Locked    | Reject request |
+| Allowed   | Confirm action |
+
+---
+
+## Confirmation
+
+### **S4c — Confirmation Prompt**
+
+Agent asks:
+
+> “Are you sure you want to modify this booking?”
+
+---
+
+### **D5_UserConfirm**
+
+| Condition | Transition       |
+| --------- | ---------------- |
+| Confirm   | Execute action   |
+| Decline   | Cancel operation |
+
+---
+
+## Execution
+
+### **S5 — Execute Apex Action**
+
+Agent invokes backend logic:
+
+* cancel reservation
+* update reservation
+
+Includes **read-before-write validation**.
+
+---
+
+### **D6_ApexOK**
+
+| Condition | Transition           |
+| --------- | -------------------- |
+| Success   | Complete transaction |
+| Failure   | Error handling       |
+
+---
+
+### **S6 — Post Transaction**
+
+Optional upsell:
+
+> “Would you like to add champagne for your table?”
+
+---
+
+## Terminal State
+
+**Reservation successfully modified or cancelled**
+
+---
+
+# Summary — State Machine View
+
+| Path          | Purpose                      | Terminal Outcome        |
+| ------------- | ---------------------------- | ----------------------- |
+| Concierge     | Personalized recommendations | Transition to booking   |
+| Escalation    | Safety + human fallback      | Human agent / ticket    |
+| RAG           | FAQ knowledge retrieval      | Answer grounded in docs |
+| Transactional | Reservation operations       | Booking updated         |
+
+---
+
+💡 **Architectural Insight (important for Agentforce interviews)**
+
+Together these four paths form a **multi-modal conversational state machine**:
+
+```
+Intent
+  │
+  ├─ Transaction Path
+  ├─ RAG Path
+  ├─ Concierge Path
+  └─ Escalation Path
+```
+
+Each path enforces **guardrails, deterministic routing, and bounded LLM usage** to prevent hallucinations.
+
+---
+
+If you'd like, I can also give you a **super clean architecture explanation you can say verbally in the Salesforce Agentforce demo (2-minute whiteboard explanation)** — which interviewers absolutely love.

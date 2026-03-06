@@ -132,6 +132,11 @@
         <editable>true</editable>
         <readable>true</readable>
     </fieldPermissions>
+    <fieldPermissions>
+        <field>Contact.Passcode__c</field>
+        <editable>true</editable>
+        <readable>true</readable>
+    </fieldPermissions>
 
     <!-- Reservation__c fields -->
     <fieldPermissions>
@@ -222,37 +227,7 @@
         <readable>true</readable>
     </fieldPermissions>
 
-    <!-- FAQ__kav fields -->
-    <fieldPermissions>
-        <field>FAQ__kav.Article_Type__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>FAQ__kav.Restaurant_Lookup__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>FAQ__kav.Answer__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>FAQ__kav.AI_Confidence_Score__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>FAQ__kav.Policy_Effective_Date__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
-    <fieldPermissions>
-        <field>FAQ__kav.PII_Sensitivity__c</field>
-        <editable>true</editable>
-        <readable>true</readable>
-    </fieldPermissions>
+    <!-- FAQ__kav: add when org has Knowledge article type. See manifest/package.xml for full deploy. -->
 
     <!-- Object permissions -->
     <objectPermissions>

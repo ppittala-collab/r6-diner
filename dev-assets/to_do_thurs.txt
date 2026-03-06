@@ -1,0 +1,175 @@
+You are a senior Salesforce Agentforce + Apex architect working in this repo.
+
+OBJECTIVE (MVP):
+Implement ROUTE_MY_ACCOUNT with secure, scoped data access using purpose-built Apex/Flow actions.
+Do NOT add a second verifier agent. Authorization must be enforced deterministically in Apex/Flow + Salesforce security.
+The LLM should only see allowlisted, user-scoped JSON that we provide.
+
+KEY DESIGN CHOICES:
+1) Single orchestrator (Agent Script YAML) remains the orchestrator.
+2) Add ROUTE_MY_ACCOUNT and my_account_type classification.
+3) Add an optional prefetch action "Get_My_Account_Context_Scoped" to fetch small, stable, non-redundant context once per session (preferences + membership + comm_style + allergy flags).
+4) Avoid redundant queries: if MyAccountContext is already populated and fresh, do not re-query it.
+5) Fetch detailed datasets (reservations list, etc.) only when needed via purpose-built scoped actions.
+
+------------------------------------------------------------
+PART A — AGENT SCRIPT UPDATES
+------------------------------------------------------------
+
+1) Add/ensure these mutable variables exist:
+- MyAccountType (string)
+- MyAccountContext (string JSON)          // cached scoped context for personalization + constraints
+- MyAccountContextFresh (string 'true'/'false')
+- MyReservationsData (string JSON)        // allowlisted reservations JSON for the current turn
+- ScopedContactId (string)               // should be set to @MessagingEndUser.ContactId
+- UserScopeState (string)                // KNOWN/UNKNOWN/GUEST/NEEDS_VERIFY/MISMATCH_RISK
+- OriginalUserMessage (string)           // preserve original message even when FollowupQuestion is used
+- FollowupQuestion (string)
+
+2) In start_agent topic_selector reasoning:
+- Preserve OriginalUserMessage = UserMessage at the beginning of each turn.
+- Ensure ScopedContactId is set from the session-linked ContactId.
+- Gate MY_ACCOUNT by scope:
+   If ScopedContactId is null OR UserScopeState != KNOWN:
+      route to ambiguous_question (ask user to confirm identity / link account; do NOT call MY_ACCOUNT actions)
+
+3) Update Intent_Classifier parsing:
+- Parse new fields:
+   route
+   my_account_type
+   confidence_score_int (0–100)
+
+4) In restaurant_information topic, add handling for ROUTE_MY_ACCOUNT:
+- When Route == ROUTE_MY_ACCOUNT:
+   (a) If MyAccountContextFresh != 'true':
+        call get_my_account_context_scoped(ContactId=ScopedContactId)
+        set MyAccountContext and MyAccountContextFresh='true'
+   (b) switch(MyAccountType):
+        - MY_ACCOUNT_RESERVATIONS:
+            call get_my_reservations_scoped(ContactId=ScopedContactId, filters derived deterministically)
+            store output into MyReservationsData
+            call promptTemplate.My_Account_QA with:
+               user_question = OriginalUserMessage
+               customer_data_json = MyReservationsData
+               account_context_json = MyAccountContext
+        - MY_ACCOUNT_PREFERENCES:
+            call promptTemplate.My_Account_QA with:
+               user_question = OriginalUserMessage
+               customer_data_json = MyAccountContext   // preferences are already here; do not re-query
+               account_context_json = MyAccountContext
+        - MY_ACCOUNT_PROFILE:
+            call promptTemplate.My_Account_QA with:
+               user_question = OriginalUserMessage
+               customer_data_json = MyAccountContext   // profile subset here; do not re-query
+               account_context_json = MyAccountContext
+        - MY_ACCOUNT_UNKNOWN:
+            route ambiguous_question
+
+5) Avoid redundant queries:
+- MyAccountContext MUST be treated as cached:
+   - Only fetched if empty OR MyAccountContextFresh != 'true'
+- Reset MyAccountContextFresh='false' if:
+   - session starts (no previous context)
+   - after an UPDATE action modifies preferences/profile (future)
+   - if a time-based TTL is implemented (optional)
+
+6) Maintain evidence-gated behavior:
+- My_Account_QA must return JSON with answerable_score_int and should_clarify.
+- Apply thresholds:
+   - >=80 answer
+   - 55–79 clarify
+   - <55 clarify or escalate depending on sensitivity (no sensitive data should be in scope for MVP)
+
+------------------------------------------------------------
+PART B — APEX ACTIONS (SECURITY CRITICAL)
+------------------------------------------------------------
+
+Implement these Apex actions (invocable or agent actions), all:
+- public with sharing class
+- enforce FLS/CRUD via WITH SECURITY_ENFORCED where possible
+- enforce allowlisted fields using Security.stripInaccessible(AccessType.READABLE,...)
+- NEVER accept arbitrary ContactId from LLM; only accept input contactId and assume orchestrator passes ScopedContactId.
+- Always validate contactId is non-null; otherwise return empty dataset + a flag.
+
+Actions:
+
+1) Get_My_Account_Context_Scoped(contactId)
+Return compact allowlisted JSON only. Keep it small and stable:
+{
+  "first_name": "...",
+  "comm_style": "friendly|concise|formal" (if stored),
+  "membership_level": "...",
+  "allergy_shellfish": true/false,
+  "allergy_nuts": true/false,
+  "dietary_preference": "vegan|vegetarian|none" (if you have it),
+  "favorite_restaurant": "..." (optional)
+}
+
+Important: This action should NOT query anything that is already available from ContactSummary if ContactSummary already includes those fields.
+If ContactSummary is already present with those same values, then:
+- Prefer building MyAccountContext in the orchestrator mapping layer,
+- OR have this action accept ContactSummary JSON and only fetch missing fields.
+Choose one approach and implement it consistently.
+
+2) Get_My_Reservations_Scoped(contactId, optional filters)
+Return allowlisted reservations JSON only:
+{
+  "reservations": [
+    {
+      "date": "YYYY-MM-DD",
+      "time": "HH:mm",
+      "restaurant_name": "...",
+      "party_size": 2,
+      "status": "Confirmed|Cancelled|Completed",
+      "confirmation_code": "..." (optional, if safe)
+    }
+  ]
+}
+
+No internal notes, no payment fields, no raw Salesforce Ids.
+
+Also enforce “no existence leak”:
+- If reservationId filter is supplied (future), validate ownership; otherwise return empty results (do not say “not authorized”).
+
+------------------------------------------------------------
+PART C — PROMPT TEMPLATE
+------------------------------------------------------------
+
+Create prompt template: My_Account_QA
+
+Inputs:
+- user_question
+- customer_data_json
+- account_context_json (optional)
+
+Output JSON ONLY:
+{
+  "answer_text": "...",
+  "answerable_score_int": 0-100,
+  "should_clarify": true|false,
+  "followup_question": "",
+  "evidence_used": ["..."]
+}
+
+Rules:
+- Answer ONLY from customer_data_json (and optionally account_context_json).
+- If information not present, set should_clarify=true and ask ONE question.
+- Never invent reservations/preferences.
+
+------------------------------------------------------------
+PART D — OUTPUT REQUIREMENTS
+------------------------------------------------------------
+
+1) Provide updated Agent Script YAML (patch or full updated blocks) implementing:
+- ROUTE_MY_ACCOUNT routing
+- caching (MyAccountContextFresh)
+- no redundant queries for preferences/profile when already in MyAccountContext
+- use OriginalUserMessage for My_Account_QA input (avoid losing the user’s original question)
+
+2) Provide Apex classes for:
+- Get_My_Account_Context_Scoped
+- Get_My_Reservations_Scoped
+
+3) Provide My_Account_QA template text.
+
+Only output code/YAML/template changes. No commentary. Start now.

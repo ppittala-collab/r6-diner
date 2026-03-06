@@ -27,7 +27,8 @@
 | Seed data script | Executed | `scripts/apex/masterSetup.apex` v3.0 — all records seeded in r6pitt1 |
 | Apex classes | Deployed | `ReservationManager.cls` — Path 1 Transactional (Modify/Cancel) |
 | Flows | Not created | `Route_to_Human_Flow` specified in PRD |
-| Agentforce config | Not created | Topics, actions, persona prompt all pending |
+| Agent prompts | Ready | `dev-assets/agent-prompts.md` — Master persona + 4 path prompts with field matrix |
+| Agentforce config | Not created | Topics, actions pending — prompts ready for builder |
 | Knowledge articles | Seeded | 14 FAQ__kav articles (10 Policy, 2 Parking, 2 Internal/Restricted PII) published |
 | Menu content | Seeded | 10 ContentVersion files with allergen-enriched menus |
 | Menu items (structured) | Seeded | 64 `Menu_Item__c` records across 10 restaurants (availability + allergens) |
@@ -117,6 +118,133 @@
 ---
 
 ## Change Log
+
+### 2026-03-03 — Phase 2: Hard Gates + Restaurant Resolver + Passcode Format
+
+#### Apex (new)
+- **EvaluateHardGates.cls** — Invocable: checks NO_SHOW_BLOCK, NEGATIVE_SENTIMENT, CHURN_RISK. Returns hardGate, gateMessage, trustGap. When gate triggers, orchestrator skips Intent_Classifier.
+- **ResolveRestaurantName.cls** — Deprecated. Ambiguous_Clarifier now uses Data Library retrieval (same as Policy/Menu/Directory) — no separate Apex.
+
+#### Passcode Format
+- **Contact.Passcode__c** — Format: first 3 letters of FirstName + 123456 (e.g., Sof123456, Mar123456). Removed default; length 15.
+- **MasterSetup.apex** — passcodeFromName() helper; all contacts get First3+123456.
+- **updatePasscodeDefault.apex** — Sets Passcode__c = First3(FirstName) + '123456' for existing contacts.
+
+#### Agent Script
+- **topic_selector** — Calls evaluate_hard_gates before classify_intent. If hardGate != NONE → escalate with gateMessage.
+- **ambiguous_question** — Calls resolve_restaurant_name first. If high confidence → send suggestedQuestion, skip LLM.
+
+#### Intent_Classifier Template
+- Removed hard gate logic (now in EvaluateHardGates). Template only runs when hardGate = NONE.
+
+---
+
+### 2026-03-03 — Phase 1: Prompt-to-Apex Migration (Auth + Escalation Priority)
+
+Replaced two LLM-based flows with deterministic Apex for lower cost and latency.
+
+#### Apex (new)
+- **GetAuthPasscodeMessage.cls** — Invocable: returns passcode request message. Inputs: isGuest, retryAfterFail, commStyle. Replaces Auth_Passcode_Prompt template.
+- **DetermineEscalationPriority.cls** — Invocable: returns priority (CRITICAL/VIP/HIGH/STANDARD), flags, queue. Inputs: contactSummary, escalationTrigger.
+
+#### Agent Script
+- **auth_required** — `request_passcode` now calls `@action.Get_Auth_Passcode_Message` (was `@promptTemplate.Auth_Passcode_Prompt`)
+- **escalation** — Added `determine_esc_priority` action; new variables EscalationPriority, EscalationFlags; prepare_handoff receives routing_priority, routing_flags
+
+#### Escalation_Handler Template
+- Added inputs: `routing_priority`, `routing_flags` (from Apex; do not compute)
+- Removed: Priority routing logic (CRITICAL/VIP/HIGH/STANDARD rules) — now in DetermineEscalationPriority
+
+#### Files
+- `force-app/main/default/classes/GetAuthPasscodeMessage.cls` (new)
+- `force-app/main/default/classes/DetermineEscalationPriority.cls` (new)
+- `dev-assets/prompt-templates/5_escalation_handler.txt` — routing inputs, simplified
+- `dev-assets/prompt-to-flow-apex-migration-plan.md` — Phase 1 marked complete
+- `manifest/package.xml` — added both classes
+
+---
+
+### 2026-03-03 — Authentication Gate (Passcode Verification)
+
+Only authenticated users can be escalated to human agents. Limits spam and non-priority escalations.
+
+#### Object & Field
+- **Contact.Passcode__c** (Text, 10 chars, default: 123456) — Verification passcode for escalation auth gate
+
+#### Apex
+- **VerifyPasscode.cls** — Invocable action: `verifyPasscode(contactId, passcodeProvided)` returns `isMatch`, `message`
+
+#### Prompt Templates
+- **Auth_Passcode_Prompt** (new) — Generates passcode request, guest message, or retry-after-fail message
+- **Escalation_Handler** — Added `is_authenticated` input; only invoked when authenticated
+
+#### Agent Script
+- **IsAuthenticated** mutable variable — Set to true after passcode verification
+- **auth_required** topic — Passcode verification gate; routes to escalation when verified, or informs Guest they cannot escalate
+- **ROUTE_ESCALATION** and **ROUTE_TRANSACTIONAL** — Now check auth first; if ContactId null or IsAuthenticated false → go_to_auth_required
+
+#### Seed & Scripts
+- **MasterSetup.apex** — All 10 Contacts now include `Passcode__c='123456'`
+- **updatePasscodeDefault.apex** (new) — One-time script to set Passcode__c='123456' for existing contacts
+
+#### FSM
+- **fsm-states-transitions.txt** — Transactional Path S1 Authentication updated to describe passcode verification
+
+#### Files Modified/Created
+- `force-app/main/default/objects/Contact/fields/Passcode__c.field-meta.xml` (new)
+- `force-app/main/default/classes/VerifyPasscode.cls` (new)
+- `dev-assets/prompt-templates/7_auth_passcode_prompt.txt` (new)
+- `dev-assets/prompt-templates/5_escalation_handler.txt` — is_authenticated input
+- `force-app/main/default/agentDefinitions/path4_knowledge_agent.agentScript` — auth_required topic, IsAuthenticated variable
+- `scripts/apex/MasterSetup.apex` — Passcode__c on all contacts
+- `scripts/apex/updatePasscodeDefault.apex` (new)
+- `manifest/package.xml`, `R6_Diner_Admin.permissionset-meta.xml`, `agentforce-setup-checklist.md`, `README.md`
+
+---
+
+### 2026-03-03 — Parallel Orchestration Architecture (Decoupled Prompts)
+
+Enforced **decoupled architecture** for token efficiency and deterministic behavior. FSM logic centralized in the Intent Classifier; downstream QA templates are pure generation engines.
+
+#### Change 1: Master System Persona Gutted (`agent-prompts.md`)
+- **Removed:** HARD GATES (No-Show, Sentiment, Churn, Trust Mismatch) — moved entirely to Intent Classifier
+- **Removed:** SAFETY section (fabrication, PII, allergy cross-ref) — now in QA templates or orchestrator
+- **Kept:** Identity, Tone (`Comm_Style__c`), Calibrated Confidence Engine table (tone only, no path logic)
+- **Simplified:** Confidence table to tone column only; STALE → output SYSTEM_FLAG_ESCALATE
+
+#### Change 2: QA Templates Lobotomized (Policy, Menu, Directory)
+- **Removed:** `FSM State: S5_Strict_RAG` — templates no longer know their path
+- **Removed:** PATH 3 TRANSITION (Concierge Crossover) from Restaurant_Directory_QA
+- **Removed:** CALIBRATED CONFIDENCE ENGINE tables, TRUST GAP CHECK, MEMBERSHIP UPSELL from Menu/Policy
+- **Replaced:** `TRANSITION: ESCALATE` / `TRANSITION: ROUTE_CONCIERGE` with strict failure string
+- **New output:** `SYSTEM_FLAG_ESCALATE` — QA templates output this exact string when they cannot answer (STALE, PII Restricted/Internal, allergen conflict, no data). Orchestrator detects and routes to escalation.
+
+#### Change 3: Hard Gates Centralized
+- Intent Classifier unchanged — remains the sole evaluator of `Churn_Risk__c`, `Sentiment_Score__c`, `Lifetime_No_Show_Count__c`, `Trust_Tolerance__c`
+- Frustrated diners and blocked accounts never reach QA templates
+
+#### Change 4: Null Handling (Guest Users)
+- **Intent Classifier:** Guest defaults: Allergies=None, Comm_Style=Brief/Efficiency, Membership=Silver, Sentiment=0, NoShows=0, Churn=false
+- **Policy QA, Menu QA, Directory QA:** Same Guest defaults for contact-derived inputs
+- **Escalation Handler:** Guest = FirstName/LastName "Guest", Membership=Silver
+- **Ambiguous Clarifier:** comm_style null → Brief/Efficiency
+
+#### Agent Script Updates
+- `restaurant_information` topic: Detect `SYSTEM_FLAG_ESCALATE` in template output (replaces TRANSITION: ESCALATE)
+- Removed ROUTE_CONCIERGE handling from Directory path (template no longer outputs it)
+- Action descriptions updated to reference SYSTEM_FLAG_ESCALATE
+
+#### Files Modified
+- `dev-assets/agent-prompts.md` — Master Persona stripped
+- `dev-assets/prompt-templates/1_intent_classifier.txt` — Null handling
+- `dev-assets/prompt-templates/2_restaurant_policy_qa.txt` — Lobotomized, null handling
+- `dev-assets/prompt-templates/3_menu_retrieval_qa.txt` — Lobotomized, null handling
+- `dev-assets/prompt-templates/4_restaurant_directory_qa.txt` — Lobotomized, null handling
+- `dev-assets/prompt-templates/5_escalation_handler.txt` — Null handling
+- `dev-assets/prompt-templates/6_ambiguous_clarifier.txt` — Null handling
+- `force-app/main/default/agentDefinitions/path4_knowledge_agent.agentScript` — SYSTEM_FLAG_ESCALATE detection
+
+---
 
 ### 2026-03-03 — PRD Verification & Reconciliation
 
@@ -476,3 +604,183 @@ New custom object providing queryable availability and allergen data per dish, c
 Added `Menu_Item__c` section to `dev-assets/prd.txt` between `Restaurant_Slot__c` and `Knowledge__kav`.
 
 #### Deploy: `0Afaj00000W8kBMCAZ` — 64/64 Succeeded
+
+---
+
+### 2026-03-03 — Agent Prompts & Path 4 Agent Script
+
+Created `dev-assets/agent-prompts.md` with:
+- Master System Persona (identity, tone calibration, confidence engine, hard gates, safety rules)
+- Path 1 (Transactional): Modify/cancel reservation prompt with lockout gates and atomic swap logic
+- Path 2 (Safety Net): Human escalation prompt with sentiment, churn, and trust-tolerance triggers
+- Path 3 (Concierge): Personalized recommendation prompt with allergen cross-referencing and menu filtering
+- Path 4 (Knowledge/RAG): FAQ and information retrieval prompt with PII gate and dual-source menu lookup
+- Field Usage Matrix mapping all fields to their consuming paths
+
+Created `force-app/main/default/agentDefinitions/path4_knowledge_agent.agentScript`:
+- Full Agentforce agent script for Path 4 (Knowledge/RAG) in YAML format
+- Topics: topic_selector, restaurant_information, escalation, off_topic, ambiguous_question
+- Debugged two syntax errors: merge field syntax (`{!$Input:ContactId}`) and invalid `@actions.*` references
+
+---
+
+### 2026-03-04 — Full Prompt Template Architecture (6 Templates)
+
+#### Problem
+The initial 3-template architecture still had inline reasoning in the Topic Selector, Escalation, and Ambiguous Question topics. The Topic Selector — the most consequential routing decision — was not versioned, testable, or tunable independently. FSM states, transitions, and variables from the PRD were not fully wired into the template/script layer.
+
+#### Solution: Every Topic Gets a Prompt Template
+
+Expanded from 3 to 6 prompt templates. The agent script is now purely an orchestration layer — it gathers context and invokes templates. ALL reasoning lives in templates.
+
+**Architecture stack:**
+
+| Layer | Tool | Components |
+|---|---|---|
+| **Orchestration** | Agent Script | 5 topics, 9 mutable/linked variables, action references, transitions |
+| **Reasoning** | 6 Prompt Templates | Intent_Classifier, Policy QA, Menu QA, Directory QA, Escalation_Handler, Ambiguous_Clarifier |
+| **Retrieval** | Actions | Get Restaurant (native), Get Diner Profile (native), QueryMenuItems (Apex), ReservationManager (Apex) |
+| **Data** | Data Library | Knowledge (FAQ__kav), File-based (3 grounding files), Menu_Item__c |
+
+#### New Prompt Templates (3)
+
+| Template | FSM State | Purpose |
+|---|---|---|
+| `Intent_Classifier` | Entry point | Classifies across all 4 FSM paths (S4_Business_Gate, S3_Circuit_Breaker, S2_Personalized_Grounding, S5_Strict_RAG), checks hard gates (no-show block, sentiment, churn risk, trust mismatch), returns structured routing decision |
+| `Escalation_Handler` | S3_Circuit_Breaker | Generates AI_Summary__c for human agents, determines routing priority (CRITICAL/VIP/HIGH/STANDARD), generates warm handoff message matching Comm_Style__c |
+| `Ambiguous_Clarifier` | Pre-classification | Fuzzy matches partial restaurant names against 10-restaurant directory, generates ONE clarifying question |
+
+#### Updated Prompt Templates (3)
+
+| Template | Changes |
+|---|---|
+| `Restaurant_Policy_QA` | Added FSM state header (S5_Strict_RAG), trust_gap input, membership_level input, explicit TRANSITION: ESCALATE output for STALE/Internal PII |
+| `Menu_Retrieval_QA` | Added FSM state header, trust_gap input, membership_level input, membership upsell rules (Path 3 crossover), TRANSITION: ESCALATE output |
+| `Restaurant_Directory_QA` | Added FSM state header, contact_summary input for personalization, allergen profile cross-reference, TRANSITION: ROUTE_CONCIERGE output for recommendation pivot |
+
+#### Agent Script Refactor
+
+System instructions changed from "you answer questions" to "you ORCHESTRATE":
+
+| Topic | Before | After |
+|---|---|---|
+| topic_selector | Inline intent classification | Invokes `Intent_Classifier` template |
+| restaurant_information | 6-step monolithic reasoning | 3-path router invoking QA templates |
+| escalation | Inline escalation logic | Invokes `Escalation_Handler` template |
+| off_topic | Unchanged | Unchanged (static guardrails, no template needed) |
+| ambiguous_question | Inline fuzzy matching | Invokes `Ambiguous_Clarifier` template |
+
+New mutable state variables added to pass context between topics:
+- `CurrentRestaurantId` — Account Id of restaurant being discussed
+- `CurrentLogicState` — cached Logic_State__c value
+- `EscalationReason` — structured trigger type (8 possible values)
+- `TrustGap` — trust mismatch flag
+
+#### Files Created
+- `genAiPromptTemplates/Intent_Classifier.genAiPromptTemplate-meta.xml`
+- `genAiPromptTemplates/Escalation_Handler.genAiPromptTemplate-meta.xml`
+- `genAiPromptTemplates/Ambiguous_Clarifier.genAiPromptTemplate-meta.xml`
+
+#### Files Updated
+- `genAiPromptTemplates/Restaurant_Policy_QA.genAiPromptTemplate-meta.xml` — FSM state, trust_gap, membership_level
+- `genAiPromptTemplates/Menu_Retrieval_QA.genAiPromptTemplate-meta.xml` — Full rewrite with FSM state, safety gate crossover, upsell
+- `genAiPromptTemplates/Restaurant_Directory_QA.genAiPromptTemplate-meta.xml` — Full rewrite with profile cross-ref, concierge transition
+- `agentDefinitions/path4_knowledge_agent.agentScript` — Pure orchestration refactor
+- `manifest/package.xml` — 6 GenAiPromptTemplate members (was 3)
+- `dev-assets/agentforce-setup-checklist.md` — Complete rewrite of Steps 4, 8, 10 for 6-template architecture
+- `README.md` — Updated project structure (6 templates), component count (71)
+- `dev-assets/changelog.md` — This entry
+
+---
+
+### 2026-03-04 — Prompt Templates & Agent Script Refactor (superseded)
+
+#### Problem
+The `restaurant_information` topic had all retrieval, reasoning, and formatting logic in a single monolithic reasoning block. This caused "I'm compiling..." stalling behavior because the agent tried to process Knowledge search, menu retrieval, allergen cross-referencing, PII gating, confidence calibration, and response formatting in one step — without pre-fetched data.
+
+#### Solution: Prompt Template Architecture
+Separated the agent into three layers following Salesforce's recommended Agentforce RAG pattern:
+
+| Layer | Tool | Responsibility |
+|---|---|---|
+| **Orchestration** | Agent Script Topics | Routing & context gathering |
+| **Reasoning** | Prompt Templates | Retrieval + formatting + safety rules |
+| **Data** | Data Library + Apex | Knowledge / Menu_Item__c records |
+
+#### Prompt Templates Created (3)
+
+| Template | File | Used For |
+|---|---|---|
+| Restaurant Policy QA | `genAiPromptTemplates/Restaurant_Policy_QA.genAiPromptTemplate-meta.xml` | Dress code, parking, reservation rules, allergen policy — uses Knowledge articles with PII gate, confidence scoring, policy freshness, Logic_State__c tone |
+| Menu Retrieval QA | `genAiPromptTemplates/Menu_Retrieval_QA.genAiPromptTemplate-meta.xml` | Menu items, vegan options, chef picks, food allergens — uses Menu_Item__c JSON with allergen safety, inventory freshness, availability filtering |
+| Restaurant Directory QA | `genAiPromptTemplates/Restaurant_Directory_QA.genAiPromptTemplate-meta.xml` | "How many restaurants?", "which are nut-free?", "list all restaurants" — uses Data Library grounding files |
+
+#### Template Input Variables
+
+| Template | Inputs |
+|---|---|
+| Policy QA | `restaurant_name`, `user_question`, `logic_state`, `knowledge_articles`, `comm_style` |
+| Menu QA | `restaurant_name`, `user_question`, `logic_state`, `menu_items`, `allergy_shellfish`, `allergy_nuts`, `comm_style` |
+| Directory QA | `user_question`, `restaurant_data`, `comm_style` |
+
+#### Agent Script Changes
+
+The `restaurant_information` topic was refactored from a 6-step monolithic reasoning block to a 3-path router:
+
+| Question Type | Router Action | Template Invoked |
+|---|---|---|
+| Policy / parking / dress code | Get Restaurant → Get Diner Profile → Knowledge RAG → | `invoke_policy_qa` |
+| Menu / food / vegan / allergens | Get Restaurant → Get Diner Profile → QueryMenuItems → | `invoke_menu_qa` |
+| Directory / network questions | Get Diner Profile → Data Library → | `invoke_directory_qa` |
+
+System instructions updated to explicitly state: "You ORCHESTRATE — you do not answer questions directly."
+
+#### Files Created
+- `force-app/main/default/genAiPromptTemplates/Restaurant_Policy_QA.genAiPromptTemplate-meta.xml`
+- `force-app/main/default/genAiPromptTemplates/Menu_Retrieval_QA.genAiPromptTemplate-meta.xml`
+- `force-app/main/default/genAiPromptTemplates/Restaurant_Directory_QA.genAiPromptTemplate-meta.xml`
+
+#### Files Updated
+- `force-app/main/default/agentDefinitions/path4_knowledge_agent.agentScript` — Refactored to orchestrator pattern with prompt template action references
+- `manifest/package.xml` — Added `GenAiPromptTemplate` type with 3 members
+- `dev-assets/agentforce-setup-checklist.md` — Added Step 4 (Prompt Templates) with detailed input mapping tables and data flow diagram; renumbered all subsequent steps
+- `README.md` — Added prompt templates to project structure, updated architecture diagram, updated component count (68)
+- `dev-assets/changelog.md` — This entry
+
+---
+
+### 2026-03-04 — Invocable Query Actions (Agent Tools)
+
+#### Problem
+The agent prompts tell the agent to "look up Account records," "query Menu_Item__c," and "read the Contact profile" — but no callable tools existed. The agent had instructions but no way to execute them.
+
+#### Solution
+Created three invocable Apex actions that Agentforce can call as tools:
+
+| Class | Label | Purpose |
+|---|---|---|
+| `QueryRestaurants.cls` | Query Restaurants | Search restaurants by name, cuisine, allergen safety, or family-friendly flag. Returns JSON array with `logicState`, `reliabilityScore`, `dataLastVerified`, pricing, blackout dates. |
+| `QueryMenuItems.cls` | Query Menu Items | Search menu items for a restaurant with filters: available-only, vegan-only, chef-picks-only, category, exclude-allergen. Returns JSON with prices, availability, allergen tags, inventory freshness. |
+| `QueryDinerProfile.cls` | Query Diner Profile | Look up a Contact by ID or email. Returns allergies, membership level, sentiment score, churn risk, trust tolerance, comm style. |
+
+#### Design Decisions
+- All actions return structured JSON strings for complex data (restaurants, menu items) so the agent can parse and reference specific fields
+- `QueryMenuItems` calculates inventory freshness in real time from `Last_Inventory_Check__c`
+- `QueryRestaurants` filters using `Cuisine_Type__c != null` to scope to restaurant Accounts only (not all Accounts)
+- All actions use `with sharing` to respect record-level security
+- SOQL queries use dynamic binding to support optional filter combinations
+
+#### Smoke Tests
+- `QueryRestaurants` with no filters: returned all 10 restaurants
+- `QueryMenuItems` for "Le Petit" with `availableOnly=true`: returned 9 items (correctly excluded sold-out Foie Gras)
+
+#### Files Created
+- `force-app/main/default/classes/QueryRestaurants.cls` + `.cls-meta.xml`
+- `force-app/main/default/classes/QueryMenuItems.cls` + `.cls-meta.xml`
+- `force-app/main/default/classes/QueryDinerProfile.cls` + `.cls-meta.xml`
+
+#### Files Updated
+- `manifest/package.xml` — Added `QueryRestaurants`, `QueryMenuItems`, `QueryDinerProfile` to `ApexClass` members
+- `README.md` — Updated project structure, component counts (67/67), and What's Next section
+
+#### Deploy: `0Afaj00000WAJWnCAP` — 3/3 Succeeded

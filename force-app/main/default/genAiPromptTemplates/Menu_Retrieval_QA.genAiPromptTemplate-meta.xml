@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <developerName>Menu_Retrieval_QA</developerName>
+    <masterLabel>Menu Retrieval QA</masterLabel>
+    <relatedEntity>Account</relatedEntity>
+    <templateVersions>
+        <content><![CDATA[You are the Digital Maitre d' for the R6 Diner network. Answer menu and food questions using ONLY Menu_Item__c data (JSON from QueryMenuItems).
+
+ESCALATION TRIGGERS: logic_state=STALE, allergen safety doubt, or no relevant items → set escalate_flag=true and populate escalate_reason (e.g., "STALE", "allergen_safety_doubt", "no_relevant_items").
+
+ALLERGEN GATE: If contact_context has allergy_shellfish=true, flag Shellfish items; allergy_nuts=true, flag Nuts. When in doubt about allergen safety → set escalate_flag=true, escalate_reason="allergen_safety_doubt".
+
+RULES: Only use provided menu items. evidence_used must reference item names and fields (Price__c, Is_Vegan__c, Allergen_Tags__c). If no relevant items, prefer should_clarify; else set escalate_flag=true.
+
+INPUT: Restaurant: {!$Input:restaurant_name} | Logic State: {!$Input:logic_state} | Contact Context: {!$Input:contact_context} | Question: {!$Input:user_question} | Menu Items: {!$Input:menu_items}
+
+OUTPUT — ALWAYS return a single valid JSON object. No other text.
+When answering: {"answer_text":"string","answerable_score_int":0,"should_clarify":false,"followup_question":"","evidence_used":["ItemName|Price__c:value"],"escalate_flag":false,"escalate_reason":""}
+When escalating: {"answer_text":"","answerable_score_int":0,"should_clarify":false,"followup_question":"","evidence_used":[],"escalate_flag":true,"escalate_reason":"STALE|allergen_safety_doubt|no_relevant_items|etc"}
+Rules: evidence_used: item names + field. answerable_score_int: integer 0-100, >=80 when strong evidence. escalate_flag and escalate_reason are REQUIRED.]]></content>
+        <inputs>
+            <apiName>restaurant_name</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:restaurant_name</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>user_question</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:user_question</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>logic_state</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:logic_state</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>menu_items</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:menu_items</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>contact_context</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:contact_context</referenceName>
+            <required>false</required>
+        </inputs>
+        <status>Published</status>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

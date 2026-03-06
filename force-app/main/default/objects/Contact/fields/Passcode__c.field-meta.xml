@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CustomField xmlns="http://soap.sforce.com/2006/04/metadata">
+    <fullName>Passcode__c</fullName>
+    <description>Verification passcode for escalation auth gate. Format: first 3 letters of FirstName + 123456 (e.g., Sof123456). User must provide it to connect with human agents.</description>
+    <label>Passcode</label>
+    <length>15</length>
+    <required>false</required>
+    <type>Text</type>
+</CustomField>

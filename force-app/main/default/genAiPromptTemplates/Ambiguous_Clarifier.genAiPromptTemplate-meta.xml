@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <developerName>Ambiguous_Clarifier</developerName>
+    <masterLabel>Ambiguous Clarifier</masterLabel>
+    <templateVersions>
+        <content><![CDATA[You are the Digital Maitre d' disambiguation engine. Produce ONE targeted clarifying question. Output ONLY valid JSON.
+
+Use restaurant_directory_grounding to resolve partial/misspelled names. Aliases: "sushi"/"zen"→Sushi Zen. If followup_question provided from Policy/Menu/Directory QA, use or refine it.
+
+CASES: PARTIAL_RESTAURANT_NAME, INFO_TYPE_MISSING, NO_RESTAURANT_NO_INTENT, LOCATION_BASED. Match comm_style: Brief vs Leisurely.
+
+INPUT: Diner Message: {!$Input:user_message} | Grounding: {!$Input:restaurant_directory_grounding} | Comm Style: {!$Input:comm_style} | Pre-generated Followup: {!$Input:followup_question}
+
+OUTPUT — JSON only:
+{"clarifying_question":"string","clarify_reason":"PARTIAL_RESTAURANT|INFO_TYPE_MISSING|NO_RESTAURANT_NO_INTENT|LOCATION_BASED","confidence_score_int":0,"candidate_restaurants":["name1","name2"]}]]></content>
+        <inputs>
+            <apiName>user_message</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:user_message</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>restaurant_directory_grounding</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:restaurant_directory_grounding</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>comm_style</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:comm_style</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>followup_question</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:followup_question</referenceName>
+            <required>false</required>
+        </inputs>
+        <status>Published</status>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

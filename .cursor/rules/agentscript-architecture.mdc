@@ -1,0 +1,52 @@
+---
+description: AgentScript syntax, structure, and FSM patterns for Agentforce
+globs: "**/*.agentScript"
+alwaysApply: false
+---
+
+# AgentScript Architecture Rules
+
+**Core principle:** Never let the LLM "decide" business rules; enforce them with deterministic logic.
+
+## 1. Syntax & Structural Rules (STRICT)
+
+- **The 3-Space Rule**: All nested blocks (under topics, reasoning, actions, inputs, outputs) MUST use exactly three (3) spaces for indentation. Standard 2 or 4-space tabs cause deployment errors.
+- **Template Expressions**: Always use `{! ... }` to inject variable values (e.g., `{!@variables.ContactId}`).
+- **Mandatory Blocks**: Every script must have `config`, `system` (with `welcome` and `error` messages), `variables`, `start_agent`, and at least one `topic`.
+
+## 2. Variables
+
+- **Mutable vs Linked**:
+  - `mutable`: For data collected during the chat or returned from actions.
+  - `linked`: For context passed natively from Salesforce (e.g., `@MessagingSession.Id`, `@MessagingEndUser.ContactId`).
+- **Inputs/Outputs Mapping**: Every action MUST explicitly map inputs from variables and outputs into variables. Never rely on implicit tool outputs.
+
+## 3. Architectural Patterns (FSM)
+
+- **State Machine Thinking**: Model the agent as a Finite State Machine — states = topics, transitions = edges, guards = conditions, actions = tools.
+- **The Router (Topic Classification)**: `start_agent` or `topic_selector` acts as the traffic controller. It uses lightweight logic to route to specialist topics via deterministic transitions.
+- **One Job Per Topic**: A topic should do exactly one job. No monolithic router topics.
+
+## 4. Deterministic vs LLM Logic
+
+- **before_reasoning**: Run deterministic actions (Apex, Get Record) before the LLM receives any prompt. Use `run @actions.x with param=@variables.y`
+- **set**: Manually map action outputs: `set @variables.out=@outputs.result`
+- **instructions**: Only tell the LLM how to classify or reason based on already-populated variables. No pseudo-code like "Call build_contact_summary".
+
+## 5. Router Pattern
+
+```ascript
+# Route based on Route variable
+ROUTE_POLICY → go_to_topic_policy
+ROUTE_MENU → go_to_topic_menu
+ROUTE_DIRECTORY → go_to_topic_directory
+```
+
+Pre-check guards (e.g., RestaurantHint == 'NONE' for POLICY/MENU) before transitioning to specialist topics.
+
+## 6. Specialist Topic Structure
+
+Each specialist topic:
+- Has its own `reasoning.instructions` and `actions`.
+- Maps all inputs/outputs explicitly to `@variables.*`.
+- Uses `@utils.transition` to escalation or ambiguous_question when needed.

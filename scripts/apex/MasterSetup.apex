@@ -165,6 +165,14 @@ System.debug('Slots inserted: ' + slots.size());
 // ==========================================
 // 4. CONTACTS (THE DINERS / UNIFIED PROFILES)
 // ==========================================
+// Passcode__c: first 3 letters of FirstName + 123456 (e.g., Sof123456, Mar123456)
+
+String passcodeFromName(String firstName) {
+    if (String.isBlank(firstName)) return '123456';
+    Integer len = Math.min(3, firstName.length());
+    return firstName.substring(0, len) + '123456';
+}
+
 List<Contact> users = new List<Contact>();
 
 // [0] Sofia — Gold, French preference, shellfish allergy, high trust tolerance (triggers escalation at low-reliability restaurants)
@@ -173,7 +181,8 @@ users.add(new Contact(
     Cuisine_Preference__c='French', Allergy_Shellfish__c=true, Allergy_Nuts__c=false,
     Comm_Style__c='Brief/Efficiency', Membership_Level__c='Gold',
     Trust_Tolerance__c=5, Sentiment_Score__c=0.90,
-    Lifetime_No_Show_Count__c=0, Churn_Risk__c=false
+    Lifetime_No_Show_Count__c=0, Churn_Risk__c=false,
+    Passcode__c=passcodeFromName('Sofia')
 ));
 
 // [1] Marcus — Silver, family diner, concierge style, low trust tolerance
@@ -183,7 +192,8 @@ users.add(new Contact(
     Allergy_Shellfish__c=false, Allergy_Nuts__c=false,
     Comm_Style__c='Leisurely/Concierge', Membership_Level__c='Silver',
     Trust_Tolerance__c=2, Sentiment_Score__c=0.50,
-    Lifetime_No_Show_Count__c=1, Churn_Risk__c=false
+    Lifetime_No_Show_Count__c=1, Churn_Risk__c=false,
+    Passcode__c=passcodeFromName('Marcus')
 ));
 
 // [2] Elena — Platinum, vegan, nut allergy, NEGATIVE sentiment + churn risk (Path 2 triggers)
@@ -192,7 +202,8 @@ users.add(new Contact(
     Cuisine_Preference__c='Vegan', Allergy_Nuts__c=true, Allergy_Shellfish__c=false,
     Comm_Style__c='Brief/Efficiency', Membership_Level__c='Platinum',
     Trust_Tolerance__c=4, Sentiment_Score__c=-0.80,
-    Lifetime_No_Show_Count__c=0, Churn_Risk__c=true
+    Lifetime_No_Show_Count__c=0, Churn_Risk__c=true,
+    Passcode__c=passcodeFromName('Elena')
 ));
 
 // [3] James — Platinum, steakhouse preference, positive sentiment (concierge upsell test)
@@ -201,7 +212,8 @@ users.add(new Contact(
     Cuisine_Preference__c='Steakhouse', Allergy_Shellfish__c=false, Allergy_Nuts__c=false,
     Comm_Style__c='Leisurely/Concierge', Membership_Level__c='Platinum',
     Trust_Tolerance__c=3, Sentiment_Score__c=0.95,
-    Lifetime_No_Show_Count__c=0, Churn_Risk__c=false
+    Lifetime_No_Show_Count__c=0, Churn_Risk__c=false,
+    Passcode__c=passcodeFromName('James')
 ));
 
 // [4] Priya — Serial no-show (Lifetime >= 3 blocks automated bookings)
@@ -210,15 +222,16 @@ users.add(new Contact(
     Cuisine_Preference__c='Indian', Allergy_Shellfish__c=false, Allergy_Nuts__c=false,
     Comm_Style__c='Brief/Efficiency', Membership_Level__c='Gold',
     Trust_Tolerance__c=3, Sentiment_Score__c=0.20,
-    Lifetime_No_Show_Count__c=4, Churn_Risk__c=true
+    Lifetime_No_Show_Count__c=4, Churn_Risk__c=true,
+    Passcode__c=passcodeFromName('Priya')
 ));
 
 // [5-9] Varied test diners
-users.add(new Contact(FirstName='Alex',  LastName='Rivera',  Email='arivera@example.com',  Cuisine_Preference__c='Mexican',    Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Silver',   Trust_Tolerance__c=3, Sentiment_Score__c=0.60));
-users.add(new Contact(FirstName='Lin',   LastName='Zhang',   Email='lzhang@example.com',   Cuisine_Preference__c='Chinese',    Comm_Style__c='Leisurely/Concierge',  Membership_Level__c='Gold',     Trust_Tolerance__c=4, Sentiment_Score__c=0.40, Family_Status__c='Stroller Access'));
-users.add(new Contact(FirstName='Sam',   LastName='Okafor',  Email='sokafor@example.com',  Cuisine_Preference__c='American',   Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Silver',   Trust_Tolerance__c=2, Sentiment_Score__c=0.70));
-users.add(new Contact(FirstName='Mia',   LastName='Tanaka',  Email='mtanaka@example.com',  Cuisine_Preference__c='Japanese',   Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Gold',     Trust_Tolerance__c=5, Sentiment_Score__c=0.85, Allergy_Shellfish__c=true));
-users.add(new Contact(FirstName='Omar',  LastName='Hassan',  Email='ohassan@example.com',  Cuisine_Preference__c='Indian',     Comm_Style__c='Leisurely/Concierge',  Membership_Level__c='Platinum', Trust_Tolerance__c=3, Sentiment_Score__c=0.55));
+users.add(new Contact(FirstName='Alex',  LastName='Rivera',  Email='arivera@example.com',  Cuisine_Preference__c='Mexican',    Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Silver',   Trust_Tolerance__c=3, Sentiment_Score__c=0.60, Passcode__c=passcodeFromName('Alex')));
+users.add(new Contact(FirstName='Lin',   LastName='Zhang',   Email='lzhang@example.com',   Cuisine_Preference__c='Chinese',    Comm_Style__c='Leisurely/Concierge',  Membership_Level__c='Gold',     Trust_Tolerance__c=4, Sentiment_Score__c=0.40, Family_Status__c='Stroller Access', Passcode__c=passcodeFromName('Lin')));
+users.add(new Contact(FirstName='Sam',   LastName='Okafor',  Email='sokafor@example.com',  Cuisine_Preference__c='American',   Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Silver',   Trust_Tolerance__c=2, Sentiment_Score__c=0.70, Passcode__c=passcodeFromName('Sam')));
+users.add(new Contact(FirstName='Mia',   LastName='Tanaka',  Email='mtanaka@example.com',  Cuisine_Preference__c='Japanese',   Comm_Style__c='Brief/Efficiency',     Membership_Level__c='Gold',     Trust_Tolerance__c=5, Sentiment_Score__c=0.85, Allergy_Shellfish__c=true, Passcode__c=passcodeFromName('Mia')));
+users.add(new Contact(FirstName='Omar',  LastName='Hassan',  Email='ohassan@example.com',  Cuisine_Preference__c='Indian',     Comm_Style__c='Leisurely/Concierge',  Membership_Level__c='Platinum', Trust_Tolerance__c=3, Sentiment_Score__c=0.55, Passcode__c=passcodeFromName('Omar')));
 
 insert users;
 System.debug('Contacts inserted: ' + users.size());

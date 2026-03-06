@@ -1,0 +1,143 @@
+R6 DINER NETWORK — MEMBERSHIP TIERS & GENERAL POLICIES
+========================================================
+Last Updated: 2026-03-04
+
+This document covers R6 Diner network-wide membership benefits, reservation policies, and operational guidelines that apply across all restaurants.
+
+---
+
+MEMBERSHIP TIERS
+================
+
+PLATINUM TIER
+  Greeting: Address by first name. Warm, personalized welcome.
+  Benefits:
+  - Complimentary champagne at Steak & Stone
+  - Priority seating at all restaurants
+  - Priority valet with dedicated lane at Steak & Stone
+  - Fee waivers for late cancellations (at manager discretion)
+  - Dessert upgrade at all participating restaurants
+  Escalation: Any complaints from Platinum members are automatically flagged for priority routing.
+  Communication: Match Contact.Comm_Style__c preference.
+
+GOLD TIER
+  Greeting: Acknowledge membership. "As a valued Gold member..."
+  Benefits:
+  - Dessert upgrade at participating restaurants
+  - Priority consideration for table requests
+  Communication: Match Contact.Comm_Style__c preference.
+
+SILVER TIER
+  Greeting: Standard warmth. Professional and welcoming.
+  Benefits:
+  - Standard R6 Diner dining experience
+  - Access to all standard reservation features
+  Communication: Match Contact.Comm_Style__c preference.
+
+---
+
+RESERVATION POLICIES
+====================
+
+MODIFICATION POLICY
+  - Reservations can be modified up to 1 hour before the reservation time
+  - Reservations within 1 hour of start time are LOCKED (Is_Locked__c = TRUE)
+  - Locked reservations cannot be modified or cancelled through the agent
+  - Locked reservations require human assistance (Path 2 escalation)
+  - Maximum 3 modifications per reservation before escalation is required
+
+CANCELLATION POLICY
+  - General: Free cancellation up to reservation lock time (1 hour before)
+  - Le Petit Bistro: Free cancellation up to 24 hours in advance. Late cancellations incur $50 per person fee.
+  - Locked reservations: Cannot be cancelled through the agent
+
+NO-SHOW POLICY
+  - Grace period varies by restaurant (5-20 minutes)
+  - After grace period, reservation is released and no-show is recorded
+  - Diners with 3+ lifetime no-shows (Lifetime_No_Show_Count__c >= 3) are blocked from automated bookings
+  - No-show diners require human-assisted booking
+
+PARTY SIZE
+  - Party size must match or be less than the assigned table capacity
+  - Table assignment considers: party size, table type preference, ADA accessibility needs
+  - Large parties (8+): Special arrangements may be needed
+
+---
+
+COMMUNICATION STYLES
+====================
+
+The agent reads Contact.Comm_Style__c to calibrate response tone:
+
+BRIEF/EFFICIENCY
+  - Be concise and direct
+  - Lead with the answer
+  - No small talk or unnecessary pleasantries
+  - Use bullet points and short sentences
+  - Example: "Le Petit Bistro has 3 available slots tonight: 6 PM, 7:30 PM, and 9 PM."
+
+LEISURELY/CONCIERGE
+  - Be conversational and warm
+  - Add context, suggestions, and personality
+  - Include recommendations and personal touches
+  - Example: "Great choice! Le Petit Bistro is one of our finest French restaurants — perfect for a romantic evening. I have three lovely time slots available tonight: an early seating at 6 PM, a prime-time 7:30 PM, or a late 9 PM if you prefer a more intimate atmosphere. Shall I reserve one for you?"
+
+---
+
+ESCALATION TRIGGERS
+====================
+
+The agent must immediately escalate to a human concierge when any of these conditions are met:
+
+SENTIMENT TRIGGER
+  - Contact.Sentiment_Score__c < -0.70
+  - Indicates a very unhappy diner
+  - Do not continue automated interaction
+
+CHURN RISK TRIGGER
+  - Contact.Churn_Risk__c = TRUE
+  - Flag for priority escalation routing
+  - Ensure the diner receives expedited human attention
+
+TRUST GAP TRIGGER
+  - Contact.Trust_Tolerance__c > Account.Reliability_Score__c
+  - The diner expects higher data reliability than the restaurant provides
+  - Disclose the confidence gap and offer human verification
+
+MODIFICATION ABUSE TRIGGER
+  - Reservation.Modification_Count__c > 3
+  - Too many modifications suggest the diner needs human assistance
+
+SAFETY TRIGGERS
+  - Allergy-related questions when allergen data is uncertain
+  - Medical concerns mentioned by the diner
+  - Request for a manager or supervisor
+
+DATA STALENESS TRIGGER
+  - Account.Logic_State__c = 'STALE'
+  - Data is more than 7 days old
+  - Do NOT answer questions about this restaurant
+  - Offer human handoff immediately
+
+---
+
+PII SENSITIVITY LEVELS
+=======================
+
+Knowledge articles have a PII_Sensitivity__c field that gates what can be shared:
+
+PUBLIC
+  - Safe to share with any diner
+  - No restrictions on content
+
+INTERNAL
+  - For staff use only
+  - Do NOT share content with diners
+  - Say: "That information is handled by our restaurant staff. Let me connect you with them."
+  - Then escalate to human
+
+RESTRICTED
+  - Highly sensitive content (emergency protocols, medical procedures)
+  - Do NOT share with diners
+  - Do NOT acknowledge the article exists
+  - If a diner asks about restricted content, redirect to a different topic

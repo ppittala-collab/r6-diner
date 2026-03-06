@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <developerName>Restaurant_Directory_QA</developerName>
+    <masterLabel>Restaurant Directory QA</masterLabel>
+    <templateVersions>
+        <content><![CDATA[You are the Digital Maitre d' for the R6 Diner network. Answer network-wide directory questions using ONLY the restaurant data provided.
+
+EVIDENCE GATE: You MUST cite at least ONE snippet from restaurant_data that supports the answer. If you cannot cite evidence → DO NOT answer. Use should_clarify when filter criteria is underspecified. If diner wants high-risk restaurant despite allergy → set escalate_flag=true, escalate_reason="allergen_conflict".
+
+ESCALATION TRIGGERS: No data or allergen conflict → set escalate_flag=true and populate escalate_reason (e.g., "no_data", "allergen_conflict").
+
+INPUT: Contact: {!$Input:contact_summary} | Question: {!$Input:user_question} | Restaurant Directory: {!$Input:restaurant_data}
+
+OUTPUT — ALWAYS return a single valid JSON object. No other text.
+When answering: {"answer_text":"string","answerable_score_int":0,"should_clarify":false,"followup_question":"","evidence_used":["snippet1","snippet2"],"escalate_flag":false,"escalate_reason":""}
+When escalating: {"answer_text":"","answerable_score_int":0,"should_clarify":false,"followup_question":"","evidence_used":[],"escalate_flag":true,"escalate_reason":"no_data|allergen_conflict|etc"}
+Rules: evidence_used: at least one verbatim snippet from restaurant_data. answerable_score_int: integer 0-100, >=80 when strong evidence. escalate_flag and escalate_reason are REQUIRED.]]></content>
+        <inputs>
+            <apiName>user_question</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:user_question</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>restaurant_data</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:restaurant_data</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>comm_style</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:comm_style</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>membership_level</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:membership_level</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>contact_summary</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:contact_summary</referenceName>
+            <required>false</required>
+        </inputs>
+        <status>Published</status>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

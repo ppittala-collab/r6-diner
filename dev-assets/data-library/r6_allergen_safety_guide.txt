@@ -1,0 +1,124 @@
+R6 DINER NETWORK — ALLERGEN & DIETARY SAFETY GUIDE
+====================================================
+Last Updated: 2026-03-04
+
+This document provides comprehensive allergen safety information for all R6 Diner network restaurants. The agent MUST cross-reference this information with the diner's allergy profile (Contact.Allergy_Shellfish__c, Contact.Allergy_Nuts__c) before making any menu or restaurant recommendations.
+
+CRITICAL SAFETY RULE: When in doubt about allergen safety, ALWAYS escalate to a human concierge. Never guess or assume safety.
+
+---
+
+NUT-FREE RESTAURANTS
+====================
+
+Vibe Vegan — CERTIFIED NUT-FREE
+  Status: 100% Nut-Free Certified kitchen
+  Details: All dishes are vegan and free from the top 8 allergens (milk, eggs, fish, shellfish, tree nuts, peanuts, wheat, soy — note: some dishes contain gluten alternatives)
+  Confidence: HIGH — Nut-Free Certified
+
+Pasta Palace — NUT-FREE AREA AVAILABLE
+  Status: Nut-free preparation area available upon request
+  Details: Main kitchen may contain nuts. Dedicated prep area can be requested. Notify staff of allergies.
+  Confidence: MODERATE — Separate prep area, not full kitchen certification
+
+Sushi Zen — NUT-FREE ON REQUEST
+  Status: Nut-free preparation available upon request
+  Details: Standard menu may contain nuts. Request nut-free preparation when ordering.
+  Confidence: LOW — Request-based, no certification
+
+---
+
+SHELLFISH-FREE RESTAURANTS
+==========================
+
+Vibe Vegan — SHELLFISH-FREE
+  Status: Fully shellfish-free kitchen
+  Details: 100% vegan kitchen. No animal products of any kind.
+  Confidence: HIGH — All-vegan facility
+
+Le Petit Bistro — SHELLFISH-FREE
+  Status: Shellfish-free kitchen environment
+  Details: All dishes prepared in a shellfish-free environment. Safe for shellfish-allergic diners.
+  Confidence: HIGH — Documented policy
+
+---
+
+SHELLFISH WARNING
+=================
+
+Sushi Zen — SHELLFISH PRESENT
+  Status: Kitchen handles shellfish EXTENSIVELY
+  Details: CANNOT guarantee a shellfish-free environment. Guests with shellfish allergies should exercise extreme caution.
+  Action: If diner has Contact.Allergy_Shellfish__c = TRUE, proactively warn and suggest alternatives (Le Petit Bistro or Vibe Vegan).
+
+---
+
+RESTAURANTS WITH NO DOCUMENTED ALLERGEN SAFETY
+===============================================
+
+The following restaurants have no documented allergen safety certifications or nut-free/shellfish-free guarantees:
+- The Burger Joint
+- Forgotten Fondue
+- Taco Tequila
+- Curry House (Certified Halal, but no allergen-specific certifications)
+- Steak & Stone (HACCP Compliant for food safety, but no allergen-specific certifications)
+- Dim Sum Garden
+
+For diners with allergies asking about these restaurants, the agent should:
+1. Recommend they notify staff of allergies upon arrival
+2. Suggest restaurants with documented allergen safety instead
+3. Offer to connect with a human concierge for detailed allergen information
+
+---
+
+HALAL CERTIFICATION
+===================
+
+Curry House — CERTIFIED HALAL
+  Status: Certified Halal kitchen. All meats are halal-sourced.
+  Confidence: HIGH — Formal certification
+
+---
+
+VEGAN-FRIENDLY RESTAURANTS
+===========================
+
+Fully Vegan:
+- Vibe Vegan — 100% vegan menu. All dishes plant-based.
+
+Vegan Options Available:
+- Curry House — Extensive vegetarian and vegan menu section
+- Pasta Palace — Vegan options available (check Menu_Item__c.Is_Vegan__c)
+- All other restaurants — Check individual Menu_Item__c records with Is_Vegan__c = TRUE
+
+---
+
+MENU ITEM ALLERGEN TAGS
+========================
+
+Individual menu items are tagged with allergen information in the Menu_Item__c.Allergen_Tags__c field. Possible values:
+- Dairy
+- Gluten
+- Nuts
+- Shellfish
+- Eggs
+- Soy
+
+The agent should use QueryMenuItems with the excludeAllergen parameter to filter out items containing specific allergens. For example:
+- Diner with nut allergy → excludeAllergen = 'Nuts'
+- Diner with shellfish allergy → excludeAllergen = 'Shellfish'
+
+Always check BOTH the restaurant-level safety (this document) AND the item-level allergen tags (Menu_Item__c) before recommending dishes.
+
+---
+
+CROSS-REFERENCE PROTOCOL
+=========================
+
+Before recommending any restaurant or dish to a diner with documented allergies:
+
+1. Check Contact.Allergy_Shellfish__c and Contact.Allergy_Nuts__c
+2. Check Account.Safe_For_Allergies__c for the restaurant
+3. Check Menu_Item__c.Allergen_Tags__c for specific dishes
+4. If ANY mismatch or uncertainty exists → Escalate to human concierge
+5. Even when data aligns, include an allergen disclaimer in the response

@@ -53,6 +53,11 @@ sf apex run --file scripts/apex/seedMenuItems.apex --target-org <alias>
 | 3 | Concierge | Discovery intent | Allergy safety gate + preference matching |
 | 4 | Knowledge | Policy/menu/FAQ question | RAG against `FAQ__kav` + `ContentVersion` |
 
+## AgentScript Conventions
+
+- **One Job Per Topic**: Each topic does exactly one job (e.g., `topic_policy`, `topic_menu`, `topic_directory`). No monolithic router topics.
+- **3-Space Indentation**: All nested blocks use exactly 3 spaces. See `.cursor/rules/agentscript-architecture.mdc` for full AgentScript rules.
+
 ## Conventions
 
 - Always update `dev-assets/changelog.md` after deployments or structural changes.

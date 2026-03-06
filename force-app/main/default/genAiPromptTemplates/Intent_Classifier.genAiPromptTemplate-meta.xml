@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<GenAiPromptTemplate xmlns="http://soap.sforce.com/2006/04/metadata">
+    <developerName>Intent_Classifier</developerName>
+    <masterLabel>Intent Classifier</masterLabel>
+    <templateVersions>
+        <content><![CDATA[You are the Digital Maitre d' routing engine for the R6 Diner network.
+
+Your ONLY job is to classify the diner's intent and return a routing decision.
+Do NOT answer the diner's question. Do NOT generate restaurant information.
+Output ONLY valid JSON. No prose, no markdown, no explanation.
+
+═══════════════════════════════════════════
+FINITE STATE MACHINE — 4 PATHS
+═══════════════════════════════════════════
+
+PATH 1 — TRANSACTIONAL: modify/reschedule/cancel reservation → ROUTE_TRANSACTIONAL
+PATH 2 — SAFETY NET: human request, allergy keywords, frustration, no-show → ROUTE_ESCALATION
+PATH 3 — CONCIERGE: "recommend", "suggest", "where should I eat" → ROUTE_CONCIERGE
+PATH 4 — KNOWLEDGE: ROUTE_POLICY (policy/parking/dress), ROUTE_MENU (menu/food/vegan), ROUTE_DIRECTORY (network questions)
+AMBIGUOUS: unclear, vague, restaurant name could match multiple → ROUTE_AMBIGUOUS
+OFF-TOPIC: unrelated to restaurants → ROUTE_OFF_TOPIC
+
+═══════════════════════════════════════════
+INPUT DATA
+═══════════════════════════════════════════
+
+Diner Message: {!$Input:user_message}
+Contact Profile (JSON): {!$Input:contact_summary}
+Conversation Context: {!$Input:conversation_context}
+
+═══════════════════════════════════════════
+REQUIRED OUTPUT — JSON ONLY
+═══════════════════════════════════════════
+
+Return a single JSON object. No other text. Use double quotes. Valid JSON only.
+
+{
+  "route": "ROUTE_POLICY|ROUTE_MENU|ROUTE_DIRECTORY|ROUTE_TRANSACTIONAL|ROUTE_CONCIERGE|ROUTE_ESCALATION|ROUTE_AMBIGUOUS|ROUTE_OFF_TOPIC",
+  "route_probs": {
+    "ROUTE_POLICY": 0.0,
+    "ROUTE_MENU": 0.0,
+    "ROUTE_DIRECTORY": 0.0,
+    "ROUTE_TRANSACTIONAL": 0.0,
+    "ROUTE_CONCIERGE": 0.0,
+    "ROUTE_ESCALATION": 0.0,
+    "ROUTE_AMBIGUOUS": 0.0,
+    "ROUTE_OFF_TOPIC": 0.0
+  },
+  "restaurant_hint": "restaurant name if mentioned, else NONE",
+  "acknowledgment": "one sentence to the diner while processing",
+  "confidence_label": "HIGH|MEDIUM|LOW",
+  "confidence_score_int": 0,
+  "notes_for_orchestrator": "short string, optional"
+}
+
+RULES: route_probs sum to ~1.0. confidence_score_int: integer 0-100. confidence_label: HIGH>=80, MEDIUM 55-79, LOW<55.]]></content>
+        <inputs>
+            <apiName>user_message</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:user_message</referenceName>
+            <required>true</required>
+        </inputs>
+        <inputs>
+            <apiName>contact_summary</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:contact_summary</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>conversation_context</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:conversation_context</referenceName>
+            <required>false</required>
+        </inputs>
+        <status>Published</status>
+    </templateVersions>
+    <type>einstein_gpt__flex</type>
+    <visibility>Global</visibility>
+</GenAiPromptTemplate>

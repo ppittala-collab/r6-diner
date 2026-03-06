@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!-- Use when org does not have FAQ__kav Knowledge article type: sf project deploy start --manifest manifest/package-deploy-no-faq.xml -->
 <Package xmlns="http://soap.sforce.com/2006/04/metadata">
 
     <types>
-        <!-- Account (Restaurant Metadata) -->
         <members>Account.Cuisine_Type__c</members>
         <members>Account.Vibe_Tags__c</members>
         <members>Account.Family_Friendly__c</members>
@@ -18,8 +18,6 @@
         <members>Account.Reliability_Reason__c</members>
         <members>Account.Inventory_Buffer_Type__c</members>
         <members>Account.Logic_State__c</members>
-
-        <!-- Contact (Diner Profile) -->
         <members>Contact.Cuisine_Preference__c</members>
         <members>Contact.Allergy_Shellfish__c</members>
         <members>Contact.Allergy_Nuts__c</members>
@@ -31,8 +29,6 @@
         <members>Contact.Lifetime_No_Show_Count__c</members>
         <members>Contact.Churn_Risk__c</members>
         <members>Contact.Passcode__c</members>
-
-        <!-- Reservation__c (Transaction Record) -->
         <members>Reservation__c.Status__c</members>
         <members>Reservation__c.Reservation_DateTime__c</members>
         <members>Reservation__c.Is_Locked__c</members>
@@ -44,19 +40,13 @@
         <members>Reservation__c.Contact__c</members>
         <members>Reservation__c.Restaurant__c</members>
         <members>Reservation__c.Party_Size__c</members>
-
-        <!-- Restaurant_Table__c (Physical Asset) -->
         <members>Restaurant_Table__c.Restaurant__c</members>
         <members>Restaurant_Table__c.Capacity__c</members>
         <members>Restaurant_Table__c.Table_Type__c</members>
         <members>Restaurant_Table__c.ADA_Accessible__c</members>
-
-        <!-- Restaurant_Slot__c (Temporal Inventory) -->
         <members>Restaurant_Slot__c.Slot_Start_Time__c</members>
         <members>Restaurant_Slot__c.Status__c</members>
         <members>Restaurant_Slot__c.Table__c</members>
-
-        <!-- Menu_Item__c (Structured Menu Inventory) -->
         <members>Menu_Item__c.Restaurant__c</members>
         <members>Menu_Item__c.Category__c</members>
         <members>Menu_Item__c.Price__c</members>
@@ -66,15 +56,6 @@
         <members>Menu_Item__c.Is_Chef_Recommendation__c</members>
         <members>Menu_Item__c.Last_Inventory_Check__c</members>
         <members>Menu_Item__c.Description__c</members>
-
-        <!-- FAQ__kav (RAG Content — org article type) -->
-        <members>FAQ__kav.Article_Type__c</members>
-        <members>FAQ__kav.Restaurant_Lookup__c</members>
-        <members>FAQ__kav.Answer__c</members>
-        <members>FAQ__kav.AI_Confidence_Score__c</members>
-        <members>FAQ__kav.Policy_Effective_Date__c</members>
-        <members>FAQ__kav.PII_Sensitivity__c</members>
-
         <name>CustomField</name>
     </types>
 
