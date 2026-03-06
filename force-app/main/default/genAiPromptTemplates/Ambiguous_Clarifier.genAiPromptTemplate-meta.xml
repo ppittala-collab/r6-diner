@@ -7,9 +7,11 @@
 
 Use restaurant_directory_grounding to resolve partial/misspelled names. Aliases: "sushi"/"zen"→Sushi Zen. If followup_question provided from Policy/Menu/Directory QA, use or refine it.
 
+When entity_resolution_context is provided (format "Restaurant: X | Candidates: [A,B,C]"): the diner mentioned a restaurant and the system found candidates. Format suggestions like "Did you mean: • Le Petit Bistro • Petit Bistro Café?" using the candidate list. Match comm_style: Brief vs Leisurely.
+
 CASES: PARTIAL_RESTAURANT_NAME, INFO_TYPE_MISSING, NO_RESTAURANT_NO_INTENT, LOCATION_BASED. Match comm_style: Brief vs Leisurely.
 
-INPUT: Diner Message: {!$Input:user_message} | Grounding: {!$Input:restaurant_directory_grounding} | Comm Style: {!$Input:comm_style} | Pre-generated Followup: {!$Input:followup_question}
+INPUT: Diner Message: {!$Input:user_message} | Grounding: {!$Input:restaurant_directory_grounding} | Comm Style: {!$Input:comm_style} | Pre-generated Followup: {!$Input:followup_question} | Entity Resolution: {!$Input:entity_resolution_context}
 
 OUTPUT — JSON only:
 {"clarifying_question":"string","clarify_reason":"PARTIAL_RESTAURANT|INFO_TYPE_MISSING|NO_RESTAURANT_NO_INTENT|LOCATION_BASED","confidence_score_int":0,"candidate_restaurants":["name1","name2"]}]]></content>
@@ -35,6 +37,12 @@ OUTPUT — JSON only:
             <apiName>followup_question</apiName>
             <definition>primitive://String</definition>
             <referenceName>Input:followup_question</referenceName>
+            <required>false</required>
+        </inputs>
+        <inputs>
+            <apiName>entity_resolution_context</apiName>
+            <definition>primitive://String</definition>
+            <referenceName>Input:entity_resolution_context</referenceName>
             <required>false</required>
         </inputs>
         <status>Published</status>

@@ -39,6 +39,9 @@ variables:
    CurrentRestaurantId: mutable string
    CurrentRestaurantName: mutable string
    CurrentLogicState: mutable string
+   MatchConfidence: mutable string
+   MatchConfidenceLabel: mutable string
+   CandidateRestaurants: mutable string
    TrustGap: mutable string
    ContactContext: mutable string
    CommStyle: mutable string
@@ -82,6 +85,12 @@ start_agent topic_selector:
 
    reasoning:
       actions:
+         # 0. Capture original message before any topic modifies it (for ambiguous clarifier)
+         - name: capture_original_message
+           action: @utils.setVariables
+           inputs:
+              OriginalUserMessage: "{!@variables.UserMessage}"
+              
          # 1. Fetch Contact & Gate Data First
          - name: build_contact_summary
            action: @action.Build_Contact_Summary
@@ -160,6 +169,13 @@ start_agent topic_selector:
 # ═══════════════════════════════════════════════════════════════
 # TOPIC POLICY
 # ═══════════════════════════════════════════════════════════════
+# Resolver logic (Policy & Menu):
+#   RestaurantHint == NONE     → skip lookup, use network defaults, continue
+#   MatchConfidenceLabel EXACT → auto-resolve, continue (user never sees correction)
+#   MatchConfidenceLabel FUZZY_HIGH → auto-resolve, continue (e.g. "petit bistro" → Le Petit Bistro)
+#   MatchConfidenceLabel FUZZY_LOW  → topic_ambiguous_question
+#   MatchConfidenceLabel NONE      → topic_ambiguous_question
+# ═══════════════════════════════════════════════════════════════
 topic topic_policy:
    label: "Policy QA"
    description: "Answer policy, parking, dress code, allergen policy questions via Restaurant_Policy_QA."
@@ -181,15 +197,49 @@ topic topic_policy:
               UserMessage: "{!@variables.OriginalUserMessage}"
               OriginalUserMessage: ""
               
-         # 3. Fetch Data & Invoke Prompt
+         # 3. Entity Resolution Guard: skip lookup when no restaurant hinted
+         - name: set_network_defaults
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint == 'NONE'}
+           inputs:
+              CurrentRestaurantName: "R6 Diner network"
+              CurrentLogicState: "DETERMINISTIC"
+              
+         # 4. Fetch restaurant only when hint provided
          - name: get_restaurant
            action: @action.Get_Restaurant
+           available: |
+              {!@variables.RestaurantHint != 'NONE'}
            inputs:
               name: "{!@variables.RestaurantHint}"
            outputs:
+              CurrentRestaurantId: "{!@variables.CurrentRestaurantId}"
               CurrentRestaurantName: "{!@variables.CurrentRestaurantName}"
               CurrentLogicState: "{!@variables.CurrentLogicState}"
+              matchConfidence: "{!@variables.MatchConfidence}"
+              matchConfidenceLabel: "{!@variables.MatchConfidenceLabel}"
+              candidateRestaurants: "{!@variables.CandidateRestaurants}"
               
+         # 5. Set ambiguous redirect when lookup failed (hint provided but no match)
+         - name: set_ambiguous_redirect
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint != 'NONE' && (@variables.CurrentRestaurantId == null || @variables.CurrentRestaurantId == '')}
+           inputs:
+              OriginalUserMessage: "{!@variables.UserMessage}"
+              FollowupQuestion: "Which restaurant are you asking about?"
+              
+         # 5b. Set ambiguous redirect when FUZZY_LOW only (FUZZY_HIGH auto-resolves, no clarification)
+         - name: set_fuzzy_ambiguous_redirect
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint != 'NONE' && @variables.MatchConfidenceLabel == 'FUZZY_LOW'}
+           inputs:
+              OriginalUserMessage: "{!@variables.UserMessage}"
+              FollowupQuestion: "Which of these restaurants did you mean?"
+              
+         # 6. Build context & Invoke Prompt
          - name: build_contact_context
            action: @action.Build_Contact_Context
            inputs:
@@ -202,6 +252,8 @@ topic topic_policy:
 
          - name: invoke_policy_qa
            action: @promptTemplate.Restaurant_Policy_QA
+           available: |
+              {!@variables.RestaurantHint == 'NONE' || (@variables.CurrentRestaurantId != null && @variables.CurrentRestaurantId != '')}
            inputs:
               restaurant_name: "{!@variables.CurrentRestaurantName}"
               user_question: "{!@variables.UserMessage}"
@@ -213,6 +265,16 @@ topic topic_policy:
               should_clarify: "{!@variables.FollowupQuestion}" 
               escalate_flag: "{!@variables.EscalateFlag}"
               escalate_reason: "{!@variables.EscalationReason}"
+
+   # Entity Resolution Guard: FUZZY_LOW only — clarify (FUZZY_HIGH auto-resolves, continues)
+   condition: |
+      {!@variables.RestaurantHint != 'NONE' && @variables.MatchConfidenceLabel == 'FUZZY_LOW'}
+   transition: topic_ambiguous_question
+
+   # Entity Resolution Guard: NONE — lookup failed (hint provided but no match)
+   condition: |
+      {!@variables.RestaurantHint != 'NONE' && (@variables.CurrentRestaurantId == null || @variables.CurrentRestaurantId == '')}
+   transition: topic_ambiguous_question
 
    # Escalate if the evidence gate failed
    condition: |
@@ -241,14 +303,46 @@ topic topic_menu:
               UserMessage: "{!@variables.OriginalUserMessage}"
               OriginalUserMessage: ""
               
+         # Entity Resolution Guard: skip lookup when no restaurant hinted
+         - name: set_network_defaults
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint == 'NONE'}
+           inputs:
+              CurrentRestaurantName: "R6 Diner network"
+              CurrentLogicState: "DETERMINISTIC"
+              
          - name: get_restaurant
            action: @action.Get_Restaurant
+           available: |
+              {!@variables.RestaurantHint != 'NONE'}
            inputs:
               name: "{!@variables.RestaurantHint}"
            outputs:
+              CurrentRestaurantId: "{!@variables.CurrentRestaurantId}"
               CurrentRestaurantName: "{!@variables.CurrentRestaurantName}"
               CurrentLogicState: "{!@variables.CurrentLogicState}"
-              CurrentRestaurantId: "{!@variables.CurrentRestaurantId}"
+              matchConfidence: "{!@variables.MatchConfidence}"
+              matchConfidenceLabel: "{!@variables.MatchConfidenceLabel}"
+              candidateRestaurants: "{!@variables.CandidateRestaurants}"
+              
+         # Set ambiguous redirect when lookup failed (hint provided but no match)
+         - name: set_ambiguous_redirect
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint != 'NONE' && (@variables.CurrentRestaurantId == null || @variables.CurrentRestaurantId == '')}
+           inputs:
+              OriginalUserMessage: "{!@variables.UserMessage}"
+              FollowupQuestion: "Which restaurant are you asking about?"
+              
+         # Set ambiguous redirect when FUZZY_LOW only (FUZZY_HIGH auto-resolves, no clarification)
+         - name: set_fuzzy_ambiguous_redirect
+           action: @utils.setVariables
+           available: |
+              {!@variables.RestaurantHint != 'NONE' && @variables.MatchConfidenceLabel == 'FUZZY_LOW'}
+           inputs:
+              OriginalUserMessage: "{!@variables.UserMessage}"
+              FollowupQuestion: "Which of these restaurants did you mean?"
               
          - name: build_contact_context
            action: @action.Build_Contact_Context
@@ -262,6 +356,8 @@ topic topic_menu:
               
          - name: query_menu_items
            action: @action.Query_Menu_Items
+           available: |
+              {!@variables.RestaurantHint == 'NONE' || (@variables.CurrentRestaurantId != null && @variables.CurrentRestaurantId != '')}
            inputs:
               restaurantId: "{!@variables.CurrentRestaurantId}"
               restaurantName: "{!@variables.CurrentRestaurantName}"
@@ -270,6 +366,8 @@ topic topic_menu:
               
          - name: invoke_menu_qa
            action: @promptTemplate.Menu_Retrieval_QA
+           available: |
+              {!@variables.RestaurantHint == 'NONE' || (@variables.CurrentRestaurantId != null && @variables.CurrentRestaurantId != '')}
            inputs:
               restaurant_name: "{!@variables.CurrentRestaurantName}"
               user_question: "{!@variables.UserMessage}"
@@ -281,6 +379,16 @@ topic topic_menu:
               should_clarify: "{!@variables.FollowupQuestion}" 
               escalate_flag: "{!@variables.EscalateFlag}"
               escalate_reason: "{!@variables.EscalationReason}"
+
+   # Entity Resolution Guard: FUZZY_LOW only — clarify (FUZZY_HIGH auto-resolves, continues)
+   condition: |
+      {!@variables.RestaurantHint != 'NONE' && @variables.MatchConfidenceLabel == 'FUZZY_LOW'}
+   transition: topic_ambiguous_question
+
+   # Entity Resolution Guard: NONE — lookup failed (hint provided but no match)
+   condition: |
+      {!@variables.RestaurantHint != 'NONE' && (@variables.CurrentRestaurantId == null || @variables.CurrentRestaurantId == '')}
+   transition: topic_ambiguous_question
 
    condition: |
       {!@variables.EscalateFlag == true}
@@ -340,6 +448,7 @@ topic topic_ambiguous_question:
               restaurant_directory_grounding: "{!@variables.RestaurantDirectoryGrounding}"
               comm_style: "{!@variables.CommStyle}"
               followup_question: "{!@variables.FollowupQuestion}"
+              entity_resolution_context: "Restaurant: {!@variables.RestaurantHint} | Candidates: {!@variables.CandidateRestaurants}"
 
    # Yield to the diner while saving state. NO transitions here!
    after_reasoning:

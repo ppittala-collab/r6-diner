@@ -1,0 +1,378 @@
+config:
+   developer_name: "R6_Diner_MaitreD"
+   default_agent_user: "Agentforce_Service_User"
+   agent_label: "R6 Diner Digital Maitre d'"
+   description: "Deterministic restaurant agent using built-in topic selection, entity resolution guards, and Prompt Templates for QA."
+
+system:
+   messages:
+      welcome: "Hi, I'm the Digital Maitre d'. I can help with restaurant menus, policies, parking, dress codes, allergen information, and reservations. How can I assist you today?"
+      error: "I'm having trouble connecting to the Diner network. Please try again or ask for a manager."
+
+variables:
+   EndUserId: linked string
+      source: @MessagingSession.MessagingEndUserId
+   RoutableId: linked string
+      source: @MessagingSession.Id
+   ContactId: linked string
+      source: @MessagingEndUser.ContactId
+   EndUserLanguage: linked string
+      source: @MessagingSession.EndUserLanguage
+
+   VerifiedCustomerId: mutable string
+   UserMessage: mutable string
+   OriginalUserMessage: mutable string
+   ConversationContext: mutable string
+   ConversationSummary: mutable string
+   ContactSummary: mutable string
+   GateMessage: mutable string
+
+   CurrentRestaurantId: mutable string
+   CurrentRestaurantName: mutable string
+   CurrentLogicState: mutable string
+   RestaurantHint: mutable string
+   MatchConfidence: mutable string
+   MatchConfidenceLabel: mutable string
+   CandidateRestaurants: mutable string
+
+   ContactContext: mutable string
+   CommStyle: mutable string
+   AllergyShellfish: mutable string
+   AllergyNuts: mutable string
+
+   ClarificationCount: mutable integer
+      description: "Tracks consecutive clarification loops. Resets to 0 on successful routing."
+
+   EscalationReason: mutable string
+   EscalationPriority: mutable string
+   EscalationFlags: mutable string
+   EscalationOutput: mutable string
+   EscalationAISummary: mutable string
+   EscalationDinerMessage: mutable string
+   ReservationSummary: mutable string
+   EscalateFlag: mutable boolean
+
+   KnowledgeArticles: mutable string
+   RestaurantData: mutable string
+   RestaurantDirectoryGrounding: mutable string
+   MenuItems: mutable string
+   PolicyAnswerableScore: mutable string
+   MenuAnswerableScore: mutable string
+   DirectoryAnswerableScore: mutable string
+   ShouldClarify: mutable string
+   FollowupQuestion: mutable string
+   EvidenceUsed: mutable string
+   QAAnswerText: mutable string
+
+# ═══════════════════════════════════════════════════════════════
+# START AGENT / TOPIC SELECTOR
+# Uses built-in topic selection
+# Runs every turn
+# ═══════════════════════════════════════════════════════════════
+start_agent topic_selector:
+   label: "Topic Selector"
+   description: "Initialize diner context, evaluate deterministic hard gates, and let the built-in topic selector choose the best topic."
+
+   before_reasoning: ->
+      set @variables.OriginalUserMessage=@variables.UserMessage
+
+      run @actions.build_contact_summary with contactId=@variables.ContactId
+      set @variables.ContactSummary=@outputs.contactSummary
+      set @variables.ContactContext=@outputs.contactContext
+      set @variables.CommStyle=@outputs.commStyle
+      set @variables.AllergyShellfish=@outputs.allergyShellfish
+      set @variables.AllergyNuts=@outputs.allergyNuts
+
+      run @actions.evaluate_hard_gates with contactSummary=@variables.ContactSummary
+      set @variables.EscalationReason=@outputs.hardGate
+      set @variables.GateMessage=@outputs.gateMessage
+
+      if @variables.ClarificationCount >= 2:
+         set @variables.EscalationReason="CLARIFICATION_LOOP"
+         transition to @topic.topic_escalation
+
+      if @variables.EscalationReason != 'NONE':
+         transition to @topic.topic_escalation
+
+   reasoning:
+      instructions: |
+         Use the built-in topic selector to choose the best topic for this diner message.
+         Do not answer directly here.
+
+   actions:
+      build_contact_summary: @action.Build_Contact_Summary
+      evaluate_hard_gates: @action.Evaluate_Hard_Gates
+
+# ═══════════════════════════════════════════════════════════════
+# POLICY
+# ═══════════════════════════════════════════════════════════════
+topic topic_policy:
+   label: "Policy QA"
+   description: "Questions about dress code, parking, hours, reservation rules, policies, and other restaurant information."
+
+   before_reasoning: ->
+      set @variables.ClarificationCount=0
+      set @variables.EscalateFlag=false
+
+      if @variables.OriginalUserMessage != "":
+         set @variables.UserMessage=@variables.OriginalUserMessage
+
+      run @actions.extract_restaurant_hint with userMessage=@variables.UserMessage
+      set @variables.RestaurantHint=@outputs.restaurantHint
+
+      # No restaurant specified: allow generic / network-wide answer
+      if @variables.RestaurantHint == 'NONE':
+         set @variables.CurrentRestaurantId=""
+         set @variables.CurrentRestaurantName="R6 Diner network"
+         set @variables.CurrentLogicState="DETERMINISTIC"
+
+      # Restaurant specified: resolve entity
+      if @variables.RestaurantHint != 'NONE':
+         run @actions.get_restaurant with name=@variables.RestaurantHint
+         set @variables.CurrentRestaurantId=@outputs.CurrentRestaurantId
+         set @variables.CurrentRestaurantName=@outputs.CurrentRestaurantName
+         set @variables.CurrentLogicState=@outputs.CurrentLogicState
+         set @variables.MatchConfidence=@outputs.matchConfidence
+         set @variables.MatchConfidenceLabel=@outputs.matchConfidenceLabel
+         set @variables.CandidateRestaurants=@outputs.candidateRestaurants
+
+      # Entity resolution guard
+      if @variables.RestaurantHint != 'NONE' and (@variables.CurrentRestaurantId == null or @variables.CurrentRestaurantId == ''):
+         set @variables.FollowupQuestion="I couldn't find that restaurant in the R6 network. Which restaurant are you asking about?"
+         transition to @topic.topic_ambiguous_question
+
+      if @variables.MatchConfidenceLabel == 'FUZZY_LOW':
+         set @variables.FollowupQuestion="Did you mean one of these restaurants?"
+         transition to @topic.topic_ambiguous_question
+
+      run @actions.retrieve_policy_grounding with query=@variables.UserMessage restaurantName=@variables.CurrentRestaurantName
+      set @variables.KnowledgeArticles=@outputs.grounding
+
+      run @actions.build_contact_context with contactSummary=@variables.ContactSummary allergyShellfish=@variables.AllergyShellfish allergyNuts=@variables.AllergyNuts
+      set @variables.ContactContext=@outputs.contactContext
+
+   reasoning:
+      instructions: |
+         Use {!@actions.invoke_policy_qa} to answer the policy question.
+
+   after_reasoning: ->
+      if @variables.EscalateFlag == true:
+         transition to @topic.topic_escalation
+
+   actions:
+      extract_restaurant_hint: @action.Extract_Restaurant_Hint
+      get_restaurant: @action.Get_Restaurant
+      retrieve_policy_grounding: @action.Retrieve_Policy_Grounding
+      build_contact_context: @action.Build_Contact_Context
+      invoke_policy_qa: @promptTemplate.Restaurant_Policy_QA
+         inputs:
+            restaurant_name: @variables.CurrentRestaurantName
+            user_question: @variables.UserMessage
+            logic_state: @variables.CurrentLogicState
+            knowledge_articles: @variables.KnowledgeArticles
+            contact_context: @variables.ContactContext
+         outputs:
+            answer_text: @variables.QAAnswerText
+            answerable_score_int: @variables.PolicyAnswerableScore
+            should_clarify: @variables.ShouldClarify
+            followup_question: @variables.FollowupQuestion
+            evidence_used: @variables.EvidenceUsed
+            escalate_flag: @variables.EscalateFlag
+            escalate_reason: @variables.EscalationReason
+
+# ═══════════════════════════════════════════════════════════════
+# MENU
+# ═══════════════════════════════════════════════════════════════
+topic topic_menu:
+   label: "Menu QA"
+   description: "Questions about menu items, dishes, vegan options, allergens, chef picks, pricing, and food."
+
+   before_reasoning: ->
+      set @variables.ClarificationCount=0
+      set @variables.EscalateFlag=false
+
+      if @variables.OriginalUserMessage != "":
+         set @variables.UserMessage=@variables.OriginalUserMessage
+
+      run @actions.extract_restaurant_hint with userMessage=@variables.UserMessage
+      set @variables.RestaurantHint=@outputs.restaurantHint
+
+      if @variables.RestaurantHint == 'NONE':
+         set @variables.CurrentRestaurantId=""
+         set @variables.CurrentRestaurantName="R6 Diner network"
+         set @variables.CurrentLogicState="DETERMINISTIC"
+
+      if @variables.RestaurantHint != 'NONE':
+         run @actions.get_restaurant with name=@variables.RestaurantHint
+         set @variables.CurrentRestaurantId=@outputs.CurrentRestaurantId
+         set @variables.CurrentRestaurantName=@outputs.CurrentRestaurantName
+         set @variables.CurrentLogicState=@outputs.CurrentLogicState
+         set @variables.MatchConfidence=@outputs.matchConfidence
+         set @variables.MatchConfidenceLabel=@outputs.matchConfidenceLabel
+         set @variables.CandidateRestaurants=@outputs.candidateRestaurants
+
+      if @variables.RestaurantHint != 'NONE' and (@variables.CurrentRestaurantId == null or @variables.CurrentRestaurantId == ''):
+         set @variables.FollowupQuestion="I couldn't find that restaurant in the R6 network. Which restaurant are you asking about?"
+         transition to @topic.topic_ambiguous_question
+
+      if @variables.MatchConfidenceLabel == 'FUZZY_LOW':
+         set @variables.FollowupQuestion="Did you mean one of these restaurants?"
+         transition to @topic.topic_ambiguous_question
+
+      if @variables.RestaurantHint != 'NONE' and @variables.CurrentRestaurantId != null and @variables.CurrentRestaurantId != '':
+         run @actions.query_menu_items with restaurantId=@variables.CurrentRestaurantId restaurantName=@variables.CurrentRestaurantName
+         set @variables.MenuItems=@outputs.menuData
+
+      run @actions.build_contact_context with contactSummary=@variables.ContactSummary allergyShellfish=@variables.AllergyShellfish allergyNuts=@variables.AllergyNuts
+      set @variables.ContactContext=@outputs.contactContext
+
+   reasoning:
+      instructions: |
+         Use {!@actions.invoke_menu_qa} to answer the menu question.
+
+   after_reasoning: ->
+      if @variables.EscalateFlag == true:
+         transition to @topic.topic_escalation
+
+   actions:
+      extract_restaurant_hint: @action.Extract_Restaurant_Hint
+      get_restaurant: @action.Get_Restaurant
+      query_menu_items: @action.Query_Menu_Items
+      build_contact_context: @action.Build_Contact_Context
+      invoke_menu_qa: @promptTemplate.Menu_Retrieval_QA
+         inputs:
+            restaurant_name: @variables.CurrentRestaurantName
+            user_question: @variables.UserMessage
+            logic_state: @variables.CurrentLogicState
+            menu_items: @variables.MenuItems
+            contact_context: @variables.ContactContext
+         outputs:
+            answer_text: @variables.QAAnswerText
+            answerable_score_int: @variables.MenuAnswerableScore
+            should_clarify: @variables.ShouldClarify
+            followup_question: @variables.FollowupQuestion
+            evidence_used: @variables.EvidenceUsed
+            escalate_flag: @variables.EscalateFlag
+            escalate_reason: @variables.EscalationReason
+
+# ═══════════════════════════════════════════════════════════════
+# DIRECTORY
+# ═══════════════════════════════════════════════════════════════
+topic topic_directory:
+   label: "Directory QA"
+   description: "Questions about the R6 restaurant network, restaurant list, locations, and directory-style discovery."
+
+   before_reasoning: ->
+      set @variables.ClarificationCount=0
+      set @variables.EscalateFlag=false
+
+      if @variables.OriginalUserMessage != "":
+         set @variables.UserMessage=@variables.OriginalUserMessage
+
+      run @actions.retrieve_directory_grounding with query=@variables.UserMessage
+      set @variables.RestaurantData=@outputs.grounding
+
+   reasoning:
+      instructions: |
+         Use {!@actions.invoke_directory_qa} to answer the directory question.
+
+   after_reasoning: ->
+      if @variables.EscalateFlag == true:
+         transition to @topic.topic_escalation
+
+   actions:
+      retrieve_directory_grounding: @action.Retrieve_Directory_Grounding
+      invoke_directory_qa: @promptTemplate.Restaurant_Directory_QA
+         inputs:
+            user_question: @variables.UserMessage
+            restaurant_data: @variables.RestaurantData
+            contact_summary: @variables.ContactSummary
+         outputs:
+            answer_text: @variables.QAAnswerText
+            answerable_score_int: @variables.DirectoryAnswerableScore
+            should_clarify: @variables.ShouldClarify
+            followup_question: @variables.FollowupQuestion
+            evidence_used: @variables.EvidenceUsed
+            escalate_flag: @variables.EscalateFlag
+            escalate_reason: @variables.EscalationReason
+
+# ═══════════════════════════════════════════════════════════════
+# AMBIGUOUS QUESTION
+# ═══════════════════════════════════════════════════════════════
+topic topic_ambiguous_question:
+   label: "Ambiguous Question"
+   description: "Ask one clarifying question when restaurant identity or user intent is unclear."
+
+   reasoning:
+      instructions: |
+         Use {!@actions.generate_clarification} to ask exactly one clarifying question.
+
+   after_reasoning: ->
+      run @actions.update_disambiguation_state with existingContext=@variables.ConversationContext originalUserMessage=@variables.OriginalUserMessage followupQuestion=@variables.FollowupQuestion currentClarificationCount=@variables.ClarificationCount
+      set @variables.ConversationContext=@outputs.conversationContext
+      set @variables.ClarificationCount=@outputs.newClarificationCount
+
+   actions:
+      update_disambiguation_state: @action.Build_Disambiguation_Context
+      generate_clarification: @promptTemplate.Ambiguous_Clarifier
+         inputs:
+            user_message: @variables.OriginalUserMessage
+            restaurant_directory_grounding: @variables.RestaurantDirectoryGrounding
+            comm_style: @variables.CommStyle
+            followup_question: @variables.FollowupQuestion
+            restaurant_hint: @variables.RestaurantHint
+            candidate_restaurants: @variables.CandidateRestaurants
+
+# ═══════════════════════════════════════════════════════════════
+# ESCALATION
+# ═══════════════════════════════════════════════════════════════
+topic topic_escalation:
+   label: "Escalation"
+   description: "Escalate to a human concierge for high-risk, blocked, or explicitly requested cases."
+
+   before_reasoning: ->
+      if @variables.ConversationSummary == null or @variables.ConversationSummary == "":
+         set @variables.ConversationSummary=@variables.ConversationContext
+
+      run @actions.get_diner_history with contactId=@variables.ContactId
+      set @variables.ReservationSummary=@outputs.reservationSummary
+
+      run @actions.determine_esc_priority with contactSummary=@variables.ContactSummary escalationTrigger=@variables.EscalationReason
+      set @variables.EscalationPriority=@outputs.priority
+      set @variables.EscalationFlags=@outputs.flags
+
+   reasoning:
+      instructions: |
+         Use {!@actions.prepare_handoff} to prepare the escalation handoff.
+
+   after_reasoning: ->
+      run @actions.execute_transfer
+
+   actions:
+      get_diner_history: @action.Get_Diner_History
+      determine_esc_priority: @action.Determine_Escalation_Priority
+      execute_transfer: @utils.escalate
+      prepare_handoff: @promptTemplate.Escalation_Handler
+         inputs:
+            escalation_trigger: @variables.EscalationReason
+            routing_priority: @variables.EscalationPriority
+            routing_flags: @variables.EscalationFlags
+            contact_summary: @variables.ContactSummary
+            conversation_summary: @variables.ConversationSummary
+            restaurant_name: @variables.CurrentRestaurantName
+            logic_state: @variables.CurrentLogicState
+            reservation_summary: @variables.ReservationSummary
+            comm_style: @variables.CommStyle
+         outputs:
+            output: @variables.EscalationOutput
+
+# ═══════════════════════════════════════════════════════════════
+# OFF TOPIC
+# ═══════════════════════════════════════════════════════════════
+topic topic_off_topic:
+   label: "Off Topic"
+   description: "Requests unrelated to restaurants, dining, menus, reservations, or the R6 network."
+
+   reasoning:
+      instructions: |
+         Respond in exactly one sentence: "I can help with R6 Diner restaurant menus, policies, parking, dress codes, allergen info, and reservations. Which restaurant are you asking about?"
